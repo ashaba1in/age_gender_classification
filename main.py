@@ -57,15 +57,16 @@ def transform_probabilities_to_img(raw, shape):
 def transform_predictions_to_img(raw, shape):
     ans = []
     for elem in tqdm(raw, disable=True):
-        ans.append(WHITE * elem + BLACK * (1 - elem))
+        ans.append(WHITE * (1 - elem) + BLACK * elem)
     return np.array(ans).reshape([shape[0], shape[1], 3])
 
 
 def get_argv():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     
-    parser.add_argument('--train_pixels', type=str, default='False', help='whether to train model or use')
+    parser.add_argument('--train_pixels', type=int, default=0, help='whether to train model or use')
     parser.add_argument('--image_dir', type=str, default='images')
+    parser.add_argument('--show_images', type=int, default=0)
     
     argv = parser.parse_args()
     return argv
@@ -73,7 +74,7 @@ def get_argv():
 
 def main():
     argv = get_argv()
-    if argv.train_pixels == 'True':
+    if argv.train_pixels:
         with open('Skin_NonSkin.txt', 'r') as input_file:
             data = np.array([parse(line) for line in tqdm(input_file.readlines(), disable=True)])
         
@@ -95,13 +96,20 @@ def main():
                 filename = os.path.join(root, _file)
                 if magic.from_file(filename, mime=True).split('/')[0] == 'image':
                     raw, shape = transform_image_to_raw(filename)
-                    probabilities_image = transform_probabilities_to_img(model.probabilities(raw), shape)
-                    predictions_image = transform_predictions_to_img(model.predict(raw), shape)
-                    cv2.imshow('original', cv2.imread(filename))
-                    cv2.imshow('probabilities', probabilities_image)
-                    cv2.imshow('predictions', predictions_image)
-                    cv2.waitKey()
-                    cv2.destroyAllWindows()
+                    predictions = model.predict(raw)
+                    if predictions.mean() > 0.5:
+                        print('person detected')
+                    else:
+                        print('no person detected')
+                    if argv.show_images:
+                        probabilities = model.probabilities(raw)
+                        probabilities_image = transform_probabilities_to_img(probabilities, shape)
+                        predictions_image = transform_predictions_to_img(predictions, shape)
+                        cv2.imshow('original', cv2.imread(filename))
+                        cv2.imshow('probabilities', probabilities_image)
+                        cv2.imshow('predictions', predictions_image)
+                        cv2.waitKey()
+                        cv2.destroyAllWindows()
 
 
 if __name__ == '__main__':
