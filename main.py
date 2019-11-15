@@ -30,12 +30,12 @@ class Model:
         print((y == 0).sum())
         self.est = self.est.fit(x, y)
         return self
-    
-    def load_est(self, path='model.pkl'):
+
+    def load_est(self, path='../model.pkl'):
         self.est = joblib.load(path)
         return self
-    
-    def save_est(self, path='model.pkl'):
+
+    def save_est(self, path='../model.pkl'):
         joblib.dump(self.est, path)
         return self
 
@@ -68,9 +68,19 @@ def get_argv():
     parser.add_argument('--train_pixels', type=int, default=0, help='whether to train model or use')
     parser.add_argument('--image_dir', type=str, default='images')
     parser.add_argument('--show_images', type=int, default=0)
+    parser.add_argument('--count_time', type=int, default=0)
+    parser.add_argument('--pred_threshold', type=float, default=0.5)
     
     argv = parser.parse_args()
     return argv
+
+
+def get_filenames(path):
+    filenames = []
+    for root, _, files in os.walk(path):
+        for _file in files:
+            filenames.append(os.path.join(root, _file))
+    return filenames
 
 
 def main():
@@ -86,34 +96,36 @@ def main():
         print('ROC-AUC for test: {:.4f}'.format(roc_auc_score(y_true=y_test, y_score=model.probabilities(x_test))))
         model.save_est()
     else:
-        directory = argv.image_dir
+        global_start = 0
+        if argv.count_time:
+            global_start = time.perf_counter()
+        total_true = 0
+        total = 0
+        prediction_threshold = argv.pred_threshold
+        filenames = get_filenames(argv.image_dir)
         model = Model(GradientBoostingClassifier()).load_est()
-        for root, dirs, files in os.walk(directory):
-            for _dir in dirs:
-                for _file in files:
-                    filename = os.path.join(root, _dir, _file)
-                    print(magic.from_file(filename))
-            for _file in files:
-                filename = os.path.join(root, _file)
-                if magic.from_file(filename, mime=True).split('/')[0] == 'image':
-                    start = time.perf_counter()
-                    raw, shape = transform_image_to_raw(filename)
-                    predictions = model.predict(raw)
-                    if predictions.mean() > 0.5:
-                        print('person detected')
-                    else:
-                        print('no person detected')
-                    print('total time per picture size {}x{}: {:.5f} seconds'.format(shape[0], shape[1],
-                                                                                     time.perf_counter() - start))
-                    if argv.show_images:
-                        probabilities = model.probabilities(raw)
-                        probabilities_image = transform_probabilities_to_img(probabilities, shape)
-                        predictions_image = transform_predictions_to_img(predictions, shape)
-                        cv2.imshow('original', cv2.imread(filename))
-                        cv2.imshow('probabilities', probabilities_image)
-                        cv2.imshow('predictions', predictions_image)
-                        cv2.waitKey()
-                        cv2.destroyAllWindows()
+        for filename in tqdm(filenames, disable=True):
+            if magic.from_file(filename, mime=True).split('/')[0] == 'image':
+                total += 1
+                if argv.count_time and total % 1000 == 0:
+                    print('total pictures {} with {:.5f}% correct'.format(total, total_true / total * 100))
+                    print('total time: {:.5f} seconds'.format(time.perf_counter() - global_start))
+                raw, shape = transform_image_to_raw(filename)
+                predictions = model.predict(raw)
+                if predictions.mean() > prediction_threshold:
+                    total_true += 1
+                if argv.show_images:
+                    probabilities = model.probabilities(raw)
+                    probabilities_image = transform_probabilities_to_img(probabilities, shape)
+                    predictions_image = transform_predictions_to_img(predictions, shape)
+                    cv2.imshow('original', cv2.imread(filename))
+                    cv2.imshow('probabilities', probabilities_image)
+                    cv2.imshow('predictions', predictions_image)
+                    cv2.waitKey()
+                    cv2.destroyAllWindows()
+        print('total pictures {} with {:.5f}% correct'.format(total, total_true / total * 100))
+        if argv.count_time:
+            print('total time: {:.5f} seconds'.format(time.perf_counter() - global_start))
 
 
 if __name__ == '__main__':
