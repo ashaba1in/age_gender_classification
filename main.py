@@ -1,13 +1,14 @@
 import argparse
+import os
+import time
+
 import cv2
 import joblib
-import numpy as np
 import magic
-import os
-
+import numpy as np
 from sklearn.ensemble import GradientBoostingClassifier
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, roc_auc_score
+from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
 WHITE = np.array([255., 255., 255.])
@@ -95,12 +96,15 @@ def main():
             for _file in files:
                 filename = os.path.join(root, _file)
                 if magic.from_file(filename, mime=True).split('/')[0] == 'image':
+                    start = time.perf_counter()
                     raw, shape = transform_image_to_raw(filename)
                     predictions = model.predict(raw)
                     if predictions.mean() > 0.5:
                         print('person detected')
                     else:
                         print('no person detected')
+                    print('total time per picture size {}x{}: {:.5f} seconds'.format(shape[0], shape[1],
+                                                                                     time.perf_counter() - start))
                     if argv.show_images:
                         probabilities = model.probabilities(raw)
                         probabilities_image = transform_probabilities_to_img(probabilities, shape)
