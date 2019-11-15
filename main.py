@@ -10,6 +10,9 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, roc_auc_score
 from tqdm import tqdm
 
+WHITE = np.array([255., 255., 255.])
+BLACK = np.array([0., 0., 0.])
+
 
 class Model:
     def __init__(self, estimator):
@@ -19,25 +22,43 @@ class Model:
         return self.est.predict(image)
     
     def probabilities(self, image):
-        return self.est.predict_proba(image)[:, 1]
+        return self.est.predict_proba(image)[:, 0]
     
     def fit(self, x, y):
+        print((y == 1).sum())
+        print((y == 0).sum())
         self.est = self.est.fit(x, y)
         return self
     
     def load_est(self, path='model.pkl'):
         self.est = joblib.load(path)
+        return self
     
     def save_est(self, path='model.pkl'):
         joblib.dump(self.est, path)
+        return self
 
 
 def parse(string: str):
     return list(map(int, string[:-1].split('\t')))
 
 
-def transform_image(image_name):
-    return cv2.cvtColor(cv2.imread(image_name), cv2.COLOR_BGR2RGB).ravel()
+def transform_image_to_raw(image_name):
+    return [cv2.imread(image_name).reshape(-1, 3), cv2.imread(image_name).shape[:2]]
+
+
+def transform_probabilities_to_img(raw, shape):
+    ans = []
+    for elem in tqdm(raw, disable=True):
+        ans.append(WHITE * elem)
+    return np.array(ans).reshape([shape[0], shape[1], 3])
+
+
+def transform_predictions_to_img(raw, shape):
+    ans = []
+    for elem in tqdm(raw, disable=True):
+        ans.append(WHITE * elem + BLACK * (1 - elem))
+    return np.array(ans).reshape([shape[0], shape[1], 3])
 
 
 def get_argv():
@@ -56,7 +77,7 @@ def main():
         with open('Skin_NonSkin.txt', 'r') as input_file:
             data = np.array([parse(line) for line in tqdm(input_file.readlines(), disable=True)])
         
-        x_train, x_test, y_train, y_test = train_test_split(data[:, [0, 1, 2]], data[:, 3], test_size=0.5)
+        x_train, x_test, y_train, y_test = train_test_split(data[:, [0, 1, 2]], data[:, 3] - 1, test_size=0.5)
         
         model = Model(GradientBoostingClassifier()).fit(x_train, y_train)
         print('Accuracy for test: {:.4f}'.format(accuracy_score(y_true=y_test, y_pred=model.predict(x_test))))
@@ -64,15 +85,23 @@ def main():
         model.save_est()
     else:
         directory = argv.image_dir
-        mime = magic.Magic(mime=True)
+        model = Model(GradientBoostingClassifier()).load_est()
         for root, dirs, files in os.walk(directory):
             for _dir in dirs:
                 for _file in files:
-                    filename = os.path.join(root, _dir,  _file)
+                    filename = os.path.join(root, _dir, _file)
                     print(magic.from_file(filename))
             for _file in files:
                 filename = os.path.join(root, _file)
-                print(mime.from_file(filename))
+                if magic.from_file(filename, mime=True).split('/')[0] == 'image':
+                    raw, shape = transform_image_to_raw(filename)
+                    probabilities_image = transform_probabilities_to_img(model.probabilities(raw), shape)
+                    predictions_image = transform_predictions_to_img(model.predict(raw), shape)
+                    cv2.imshow('original', cv2.imread(filename))
+                    cv2.imshow('probabilities', probabilities_image)
+                    cv2.imshow('predictions', predictions_image)
+                    cv2.waitKey()
+                    cv2.destroyAllWindows()
 
 
 if __name__ == '__main__':
