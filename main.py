@@ -11,8 +11,8 @@ from sklearn.metrics import accuracy_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
-WHITE = 255
-BLACK = 0
+WHITE = 255.
+BLACK = 0.
 
 
 class Model:
@@ -30,11 +30,11 @@ class Model:
         print((y == 0).sum())
         self.est = self.est.fit(x, y)
         return self
-
+    
     def load_est(self, path='../model.pkl'):
         self.est = joblib.load(path)
         return self
-
+    
     def save_est(self, path='../model.pkl'):
         joblib.dump(self.est, path)
         return self
@@ -49,14 +49,13 @@ def transform_image_to_raw(image_name):
 
 
 def transform_probabilities_to_img(raw, shape):
-    tmp = raw * WHITE
-    return np.vstack((tmp, tmp, tmp)).T.reshape([shape[0], shape[1], 3])
+    print(test.pred())
+    return np.repeat((raw * WHITE).reshape(-1, 1), 3, axis=1).reshape([shape[0], shape[1], 3])
 
 
 def transform_predictions_to_img(raw, shape):
     mask = raw == 0
-    tmp = mask * WHITE + ~mask * BLACK
-    return np.vstack((tmp, tmp, tmp)).T.reshape([shape[0], shape[1], 3])
+    return np.repeat((mask * WHITE + ~mask * BLACK).reshape(-1, 1), 3, axis=1).reshape([shape[0], shape[1], 3])
 
 
 def get_argv():
