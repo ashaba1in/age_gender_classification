@@ -11,8 +11,8 @@ from sklearn.metrics import accuracy_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
-WHITE = np.array([255., 255., 255.])
-BLACK = np.array([0., 0., 0.])
+WHITE = 255
+BLACK = 0
 
 
 class Model:
@@ -49,17 +49,14 @@ def transform_image_to_raw(image_name):
 
 
 def transform_probabilities_to_img(raw, shape):
-    ans = []
-    for elem in tqdm(raw, disable=True):
-        ans.append(WHITE * elem)
-    return np.array(ans).reshape([shape[0], shape[1], 3])
+    tmp = raw * WHITE
+    return np.vstack((tmp, tmp, tmp)).T.reshape([shape[0], shape[1], 3])
 
 
 def transform_predictions_to_img(raw, shape):
-    ans = []
-    for elem in tqdm(raw, disable=True):
-        ans.append(WHITE * (1 - elem) + BLACK * elem)
-    return np.array(ans).reshape([shape[0], shape[1], 3])
+    mask = raw == 0
+    tmp = mask * WHITE + ~mask * BLACK
+    return np.vstack((tmp, tmp, tmp)).T.reshape([shape[0], shape[1], 3])
 
 
 def get_argv():
