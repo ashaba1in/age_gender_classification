@@ -1,9 +1,9 @@
 import argparse
 from urllib import request
 
-import tqdm
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
+from tqdm import tqdm
 
 
 def find(driver):
@@ -45,8 +45,8 @@ def main():
                 print(e.__class__)
     
     browser.close()
-    
-    for file_name, source in tqdm.tqdm(enumerate(sources), disable=True):
+
+    for file_name, source in tqdm(enumerate(sources), disable=True):
         with request.urlopen(source) as response, open(get_argv().save_path + str(file_name), 'wb') as out_file:
             data = response.read()
             out_file.write(data)
