@@ -42,12 +42,15 @@ def main():
             try:
                 sources.add(image.get_attribute('href'))
             except Exception as e:
-                print(e.__class__)
+                error = e.__class__
     
     browser.close()
+    save_path = get_argv().save_path
+    if save_path[-1] != '/':
+        save_path += '/'
 
-    for file_name, source in tqdm(enumerate(sources), disable=True):
-        with request.urlopen(source) as response, open(get_argv().save_path + str(file_name), 'wb') as out_file:
+    for file_name, source in tqdm(enumerate(sources)):
+        with request.urlopen(source) as response, open(save_path + str(file_name), 'wb') as out_file:
             data = response.read()
             out_file.write(data)
 

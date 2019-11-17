@@ -36,6 +36,9 @@ def main():
     human = get_argv().human
     image_path = get_argv().image_path
     filenames = get_filenames(image_path)
+    save_path = get_argv().save_path
+    if save_path[-1] != '/':
+        save_path += '/'
     total_faces = 0
     for filename in tqdm(filenames, disable=True):
         print(filename)
@@ -46,7 +49,7 @@ def main():
                 for pos, d in enumerate(detected):
                     x1, y1 = d.rect.left(), d.rect.top()
                     x2, y2 = d.rect.right() + 1, d.rect.bottom() + 1
-                    save_face(os.path.splitext(filename)[0],
+                    save_face(save_path,
                               magic.from_file(filename, mime=True).split('/')[1],
                               human,
                               total_faces,
