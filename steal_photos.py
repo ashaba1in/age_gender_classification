@@ -51,8 +51,11 @@ def main():
 
     for file_name, source in tqdm(enumerate(sources)):
         with request.urlopen(source) as response, open(save_path + str(file_name), 'wb') as out_file:
-            data = response.read()
-            out_file.write(data)
+            try:
+                data = response.read()
+                out_file.write(data)
+            finally:
+                pass
 
 
 if __name__ == '__main__':

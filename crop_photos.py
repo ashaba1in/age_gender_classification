@@ -7,6 +7,8 @@ import magic
 import numpy as np
 from tqdm import tqdm
 
+MAX_IMG_SIZE = 300
+
 
 def get_argv():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -19,12 +21,22 @@ def get_argv():
     return argv
 
 
+def resize_image(image: np.ndarray):
+    k = image.shape[0] / image.shape[1]
+    if image.shape[0] > MAX_IMG_SIZE or image.shape[1] > MAX_IMG_SIZE:
+        if k >= 1:
+            return cv2.resize(image, (MAX_IMG_SIZE, int(MAX_IMG_SIZE * k)))
+        else:
+            return cv2.resize(image, (int(MAX_IMG_SIZE * k), MAX_IMG_SIZE))
+    return image
+
+
 def get_filenames(path: str):
     filenames = []
     for root, _, files in os.walk(path):
         for _file in files:
             filenames.append(os.path.join(root, _file))
-    return sorted(filenames, key=lambda x: int(x.split('/')[-1]))
+    return filenames
 
 
 def save_face(save_path: str, ext: str, human: bool, enum: int, image: np.ndarray):
@@ -43,7 +55,7 @@ def main():
     for filename in tqdm(filenames, disable=True):
         print(filename)
         if magic.from_file(filename, mime=True).split('/')[0] == 'image':
-            input_image = cv2.resize(cv2.imread(filename), (800, 800))
+            input_image = resize_image(cv2.imread(filename))
             detected = detector(input_image, 0)
             if len(detected):
                 for pos, d in enumerate(detected):

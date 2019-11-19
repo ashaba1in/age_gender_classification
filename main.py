@@ -13,6 +13,7 @@ from tqdm import tqdm
 
 WHITE = 255.
 BLACK = 0.
+MAX_IMG_SIZE = 300
 
 
 class Model:
@@ -42,8 +43,18 @@ def parse(string: str):
     return list(map(int, string[:-1].split('\t')))
 
 
+def resize_image(image: np.ndarray):
+    k = image.shape[0] / image.shape[1]
+    if image.shape[0] > MAX_IMG_SIZE or image.shape[1] > MAX_IMG_SIZE:
+        if k >= 1:
+            return cv2.resize(image, (MAX_IMG_SIZE, int(MAX_IMG_SIZE * k)))
+        else:
+            return cv2.resize(image, (int(MAX_IMG_SIZE * k), MAX_IMG_SIZE))
+    return image
+
+
 def transform_image_to_raw(image_name: str):
-    return [cv2.resize(cv2.imread(image_name), (200, 200)).reshape(-1, 3), cv2.imread(image_name).shape[:2]]
+    return [resize_image(cv2.imread(image_name)).reshape(-1, 3), cv2.imread(image_name).shape[:2]]
 
 
 def transform_probabilities_to_img(raw: np.ndarray, shape: tuple):
@@ -63,7 +74,7 @@ def get_argv():
     parser.add_argument('--show_images', type=bool, default=False)
     parser.add_argument('--count_time', type=bool, default=True)
     parser.add_argument('--pred_threshold', type=float)
-    parser.add_argument('--count_mean_pred', type=bool, default=False)
+    parser.add_argument('--count_stats_pred', type=bool, default=False)
     parser.add_argument('--test', type=bool, default=False)
     
     argv = parser.parse_args()
@@ -94,27 +105,35 @@ def main():
         global_start = 0
         if argv.count_time:
             global_start = time.perf_counter()
-        total = 0
-        mistakes = 0
+        mistakes_human1 = 0
+        mistakes_human0 = 0
+        total_human0 = 0
+        total_human1 = 0
         prediction_threshold = argv.pred_threshold
         filenames = get_filenames(argv.image_path)
         model = Model(GradientBoostingClassifier()).load_est()
         for filename in tqdm(filenames, disable=True):
             if magic.from_file(filename, mime=True).split('/')[0] == 'image':
                 human = int(filename.split('_')[1])
-                total += 1
-                if argv.count_time and total % 1000 == 0:
-                    print('total pictures {} with {:.5f}% correct'.format(total, 100 - mistakes / total * 100))
+                total_human0 += 1 - human
+                total_human1 += human
+                if argv.count_time and (total_human0 + total_human1) % 1000 == 0:
+                    print('total pictures {} with {:.5%} correct'.format(
+                        total_human0 + total_human1,
+                        1 - (mistakes_human0 + mistakes_human1) / (total_human0 + total_human1)))
+                    print('human correct {:.5%}'.format(1 - mistakes_human1 / total_human1))
+                    print('not human correct {:.5%}'.format(1 - mistakes_human0 / total_human0))
                     print('total time: {:.5f} seconds'.format(time.perf_counter() - global_start))
                 raw, shape = transform_image_to_raw(filename)
                 predictions = model.predict(raw)
-    
-                if human:
-                    if predictions.mean() < prediction_threshold:
-                        mistakes += 1
-                else:
-                    if predictions.mean() > prediction_threshold:
-                        mistakes += 1
+
+                if (human and predictions.mean() < prediction_threshold) or (
+                        not human and predictions.mean() > prediction_threshold):
+                    print(filename)
+                    if human:
+                        mistakes_human1 += 1
+                    else:
+                        mistakes_human0 += 1
                 
                 if argv.show_images:
                     probabilities = model.probabilities(raw)
@@ -129,28 +148,33 @@ def main():
                     cv2.waitKey()
                     cv2.destroyAllWindows()
 
-        print('total pictures {} with {:.5f}% correct'.format(total, 100 - mistakes / total * 100))
+        print('total pictures {} with {:.5%} correct'.format(
+            total_human0 + total_human1,
+            1 - (mistakes_human0 + mistakes_human1) / (total_human0 + total_human1)))
+        print('human correct {:.5%}'.format(1 - mistakes_human1 / total_human1))
+        print('not human correct {:.5%}'.format(1 - mistakes_human0 / total_human0))
         if argv.count_time:
             print('total time: {:.5f} seconds'.format(time.perf_counter() - global_start))
-    elif argv.count_mean_pred:
+    elif argv.count_stats_pred:
         global_start = 0
         if argv.count_time:
             global_start = time.perf_counter()
-        total_pred = 0
-        total_count = 0
+        predictions = []
         filenames = get_filenames(argv.image_path)
         model = Model(GradientBoostingClassifier()).load_est()
         for filename in tqdm(filenames, disable=True):
             if magic.from_file(filename, mime=True).split('/')[0] == 'image':
                 raw, shape = transform_image_to_raw(filename)
-                predictions = model.predict(raw)
-                total_count += 1
-                total_pred += predictions.mean()
-                if argv.count_time and total_count % 1000 == 0:
-                    print('Mean prediction on {} images: {:.4f}'.format(total_count, total_pred / total_count))
+                predictions.append(model.predict(raw).mean())
+                if argv.count_time and len(predictions) % 1000 == 0:
+                    print('Mean prediction on {} images: {:.4f}, variance: {:.4f}'.format(len(predictions),
+                                                                                          np.mean(predictions),
+                                                                                          np.var(predictions, ddof=1)))
                     print('total time: {:.5f} seconds'.format(time.perf_counter() - global_start))
-    
-        print('Mean prediction on {} images: {:.4f}'.format(total_count, total_pred / total_count))
+
+        print('Mean prediction on {} images: {:.4f}, variance: {:.4f}'.format(len(predictions), np.mean(predictions),
+                                                                              np.var(predictions, ddof=1)))
+        print('99% quantile: {:4f}'.format(np.percentile(np.array(predictions), 1)))
         if argv.count_time:
             print('total time: {:.5f} seconds'.format(time.perf_counter() - global_start))
 
