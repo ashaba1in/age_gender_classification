@@ -2,6 +2,7 @@ import argparse
 from urllib import request
 
 from selenium import webdriver
+from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from tqdm import tqdm
 
@@ -26,7 +27,9 @@ def get_argv():
 
 
 def main():
-    browser = webdriver.PhantomJS()
+    options = Options()
+    options.headless = True
+    browser = webdriver.Firefox(options=options)
     browser.get(get_argv().load_url)
     
     sources = set([])
