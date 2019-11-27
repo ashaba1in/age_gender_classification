@@ -54,7 +54,7 @@ def resize_image(image: np.ndarray):
 
 
 def transform_image_to_raw(image_name: str):
-    return [resize_image(cv2.imread(image_name)).reshape(-1, 3), cv2.imread(image_name).shape[:2]]
+    return [resize_image(cv2.imread(image_name)).reshape(-1, 3), resize_image(cv2.imread(image_name)).shape[:2]]
 
 
 def transform_probabilities_to_img(raw: np.ndarray, shape: tuple):
@@ -95,8 +95,8 @@ def main():
         with open('../Skin_NonSkin.txt', 'r') as input_file:
             data = np.array([parse(line) for line in tqdm(input_file.readlines(), disable=True)])
 
-        x_train, x_test, y_train, y_test = train_test_split(data[:, [0, 1, 2]], 2 - data[:, 3], test_size=0.5)
-        
+        x_train, x_test, y_train, y_test = train_test_split(data[:, [0, 1, 2]], 2 - data[:, 3], test_size=0.2)
+
         model = Model(GradientBoostingClassifier()).fit(x_train, y_train)
         print('Accuracy for test: {:.4f}'.format(accuracy_score(y_true=y_test, y_pred=model.predict(x_test))))
         print('ROC-AUC for test: {:.4f}'.format(roc_auc_score(y_true=y_test, y_score=model.probabilities(x_test))))
@@ -129,7 +129,6 @@ def main():
 
                 if (human and predictions.mean() < prediction_threshold) or (
                         not human and predictions.mean() > prediction_threshold):
-                    print(filename)
                     if human:
                         mistakes_human1 += 1
                     else:
@@ -174,7 +173,7 @@ def main():
 
         print('Mean prediction on {} images: {:.4f}, variance: {:.4f}'.format(len(predictions), np.mean(predictions),
                                                                               np.var(predictions, ddof=1)))
-        print('99% quantile: {:4f}'.format(np.percentile(np.array(predictions), 1)))
+        print('99% percentile: {:4f}'.format(np.percentile(np.array(predictions), 1)))
         if argv.count_time:
             print('total time: {:.5f} seconds'.format(time.perf_counter() - global_start))
 

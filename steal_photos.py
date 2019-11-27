@@ -16,17 +16,17 @@ def find(driver):
 
 def get_argv():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    
+
     parser.add_argument('--save_path', type=str)
     parser.add_argument('--load_url', type=str)
     parser.add_argument('--load_count', type=int)
-    
+
     argv = parser.parse_args()
     return argv
 
 
 def main():
-    browser = webdriver.Firefox()
+    browser = webdriver.PhantomJS()
     browser.get(get_argv().load_url)
     
     sources = set([])
