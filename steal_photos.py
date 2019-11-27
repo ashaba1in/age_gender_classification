@@ -52,6 +52,10 @@ def main():
     if save_path[-1] != '/':
         save_path += '/'
 
+    with open(save_path + 'src.txt', 'w') as file:
+        for file_name, source in tqdm(enumerate(sources)):
+            file.write('{}\t{}'.format(file_name, source))
+    
     for file_name, source in tqdm(enumerate(sources)):
         with request.urlopen(source) as response, open(save_path + str(file_name), 'wb') as out_file:
             try:
