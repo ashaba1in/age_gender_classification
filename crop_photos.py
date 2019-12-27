@@ -42,7 +42,7 @@ def main():
     for filename in tqdm(filenames):
         if magic.from_file(filename, mime=True).split('/')[0] == 'image':
             image = cv2.imread(filename)
-            detected = detector(cv2.cvtColor(image, cv2.COLOR_BGR2RGB), 0)
+            detected = detector(cv2.resize(cv2.cvtColor(image, cv2.COLOR_BGR2RGB), (2500, 2500)), 0)
             for pos, d in enumerate(detected):
                 x1, y1 = d.rect.left(), d.rect.top()
                 x2, y2 = d.rect.right() + 1, d.rect.bottom() + 1
