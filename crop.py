@@ -1,13 +1,11 @@
 import argparse
 import os
 
-import cv2.cv2 as cv2
 import magic
 import numpy as np
 from PIL import Image
+from classes import FaceHandler
 from tqdm import tqdm
-
-from .classes import FaceHandler
 
 
 def get_filenames(path):
@@ -69,17 +67,15 @@ def main():
 
         image = np.asarray(new_im)
 
-        if image.shape[0] != 0 and image.shape[1] != 0:
-            image = cv2.resize(image, (600, 600))
-        else:
+        if image.shape[0] == 0 or image.shape[1] == 0:
             pass
-        
+
         tmp_args = {
             'human': args.get('human'),
             'total': total,
             'ext': magic.from_file(filename, mime=True).split('/')[1]
         }
-        
+
         total = fh.process(image, tmp_args)
     
     print('Total faces {}'.format(total))
