@@ -1,7 +1,7 @@
 import argparse
 import os
 
-import cv2
+import cv2.cv2 as cv2
 import dlib
 import magic
 import numpy as np
@@ -31,7 +31,7 @@ def save_face(save_path: str, ext: str, human: bool, enum: int, image: np.ndarra
 
 
 def main():
-    detector = dlib.cnn_face_detection_model_v1("data/dlib_cnn_weight.dat")
+    detector = dlib.cnn_face_detection_model_v1('data/dlib_cnn_weight.dat')
     human = get_argv().human
     image_path = get_argv().image_path
     filenames = get_filenames(image_path)
@@ -42,7 +42,6 @@ def main():
     for filename in tqdm(filenames):
         if magic.from_file(filename, mime=True).split('/')[0] == 'image':
             image = cv2.imread(filename)
-            image = cv2.resize(image, (500, 500))
             detected = detector(cv2.cvtColor(image, cv2.COLOR_BGR2RGB), 0)
             for pos, d in enumerate(detected):
                 x1, y1 = d.rect.left(), d.rect.top()
@@ -56,7 +55,7 @@ def main():
                         image[y1:y2 + 1, x1:x2 + 1, :]
                     )
                     total_faces += 1
-
+    
     print('Найдено {} лиц'.format(total_faces))
 
 

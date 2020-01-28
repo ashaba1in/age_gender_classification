@@ -19,7 +19,6 @@ import torch.nn.functional as F
 import torchvision
 import torchvision.transforms as transforms
 from PIL import Image
-from sklearn.manifold import TSNE
 from torch.utils.data import TensorDataset, DataLoader
 
 sns.set(style='darkgrid')
@@ -231,46 +230,6 @@ def main():
     plt.plot(history[:, 1], marker='.', label='fake')
     plt.legend()
     plt.savefig('models_data/accuracy_{}.png'.format(model_name))
-    
-    final = None
-    try:
-        final = model.fc
-    finally:
-        final = model.classifier
-    inputs = []
-    
-    def collect_inputs(_, i, __):
-        inputs.append(i)
-    
-    hs = final.register_forward_hook(collect_inputs)
-    
-    with torch.no_grad():
-        for images, _ in loader:
-            images = images.to(device)
-            model(images)
-    
-    hs.remove()
-    
-    inputs = np.array(inputs)
-    
-    new_x = []
-    for elem in inputs:
-        for _ in elem[0]:
-            new_x.append(np.array(_.cpu()))
-    
-    new_x = np.array(new_x)
-    
-    x_transformed = TSNE().fit_transform(new_x)
-    
-    colors = ['red', 'black']
-    names = ['Памятник', 'Лицо']
-    plt.figure(figsize=(15, 15))
-    plt.title('visualizing classes')
-    for i in range(2):
-        mask = np.array(loader.dataset.targets) == i
-        plt.scatter(x_transformed[:, 1][mask], x_transformed[:, 0][mask], label=names[i], color=colors[i])
-    plt.legend()
-    plt.savefig('models_data/tsne_{}'.format(model_name))
     
     torch.save(model.state_dict(), 'models_data/{}.pth'.format(model_name))
 
