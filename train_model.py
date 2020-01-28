@@ -112,6 +112,7 @@ def get_argv():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     
     parser.add_argument('--image_path', type=str, default='faces/')
+    parser.add_argument('--epochs', type=int, default=NUM_EPOCHS)
     parser.add_argument('--model_name', type=str)
     
     argv = parser.parse_args()
@@ -122,48 +123,70 @@ def main():
     argv = get_argv()
     model_name = argv.model_name
     model = None
+    
     possible_names = ['ResNeXt-101-32x8d', 'WideResNet-101-2', 'WideResNet-50-2', 'ResNet-152', 'Densenet-161',
                       'ResNeXt-50-32x4d', 'ResNet-101', 'Densenet-201', 'ResNet-50', 'Densenet-169',
                       'Densenet-121', 'ResNet-34', 'ResNet-18']
+    
+    class Identity(nn.Module):
+        def __init__(self):
+            super(Identity, self).__init__()
+        
+        def forward(self, x):
+            return x
+    
     if model_name in possible_names:
         if model_name == 'ResNet-18':
             model = torchvision.models.resnet18(pretrained=True)
+            model.pool0 = Identity()
             model.fc = nn.Linear(model.fc.in_features, NUM_CLASSES)
         elif model_name == 'ResNet-34':
             model = torchvision.models.resnet34(pretrained=True)
+            model.pool0 = Identity()
             model.fc = nn.Linear(model.fc.in_features, NUM_CLASSES)
         elif model_name == 'ResNet-50':
             model = torchvision.models.resnet50(pretrained=True)
+            model.pool0 = Identity()
             model.fc = nn.Linear(model.fc.in_features, NUM_CLASSES)
         elif model_name == 'ResNet-101':
             model = torchvision.models.resnet101(pretrained=True)
+            model.pool0 = Identity()
             model.fc = nn.Linear(model.fc.in_features, NUM_CLASSES)
         elif model_name == 'ResNet-152':
             model = torchvision.models.resnet152(pretrained=True)
+            model.pool0 = Identity()
             model.fc = nn.Linear(model.fc.in_features, NUM_CLASSES)
         elif model_name == 'ResNeXt-50-32x4d':
             model = torchvision.models.resnext50_32x4d(pretrained=True)
+            model.pool0 = Identity()
             model.fc = nn.Linear(model.fc.in_features, NUM_CLASSES)
         elif model_name == 'ResNeXt-101-32x8d':
             model = torchvision.models.resnext101_32x8d(pretrained=True)
+            model.pool0 = Identity()
             model.fc = nn.Linear(model.fc.in_features, NUM_CLASSES)
         elif model_name == 'WideResNet-50-2':
             model = torchvision.models.wide_resnet50_2(pretrained=True)
+            model.pool0 = Identity()
             model.fc = nn.Linear(model.fc.in_features, NUM_CLASSES)
         elif model_name == 'WideResNet-101-2':
             model = torchvision.models.wide_resnet101_2(pretrained=True)
+            model.pool0 = Identity()
             model.fc = nn.Linear(model.fc.in_features, NUM_CLASSES)
         elif model_name == 'Densenet-121':
             model = torchvision.models.densenet121(pretrained=True)
+            model.features.pool0 = Identity()
             model.fc = nn.Linear(model.classifier.in_features, NUM_CLASSES)
         elif model_name == 'Densenet-169':
             model = torchvision.models.densenet169(pretrained=True)
+            model.features.pool0 = Identity()
             model.fc = nn.Linear(model.classifier.in_features, NUM_CLASSES)
         elif model_name == 'Densenet-201':
             model = torchvision.models.densenet201(pretrained=True)
+            model.features.pool0 = Identity()
             model.fc = nn.Linear(model.classifier.in_features, NUM_CLASSES)
         elif model_name == 'Densenet-161':
             model = torchvision.models.densenet161(pretrained=True)
+            model.features.pool0 = Identity()
             model.fc = nn.Linear(model.classifier.in_features, NUM_CLASSES)
     
     loader = load_data(argv.image_path)
@@ -179,10 +202,11 @@ def main():
     
     history = []
     
-    for epoch in range(NUM_EPOCHS):
+    for epoch in range(argv.epochs):
         train(loader, model, optimizer, criterion)
         history.append(evaluate(loader, model))
         lr_scheduler.step(epoch)
+        torch.save(model.state_dict(), 'models_data/{}.pth'.format(model_name))
     
     history = np.array(history)
     

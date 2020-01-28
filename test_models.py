@@ -79,31 +79,20 @@ def main():
     mistakes_human0 = 0
     total_human0 = 0
     total_human1 = 0
-    mistakes_mem0 = 0
-    mistakes_mem1 = 0
-    mistakes_ad0 = 0
-    mistakes_ad1 = 0
     x, y = get_data(get_filenames(argv.image_path))
     dataset = ImageDataset(pd.DataFrame(data={'filename': x, 'target': y}), mode='test')
     loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
     
-    for images, labels, filenames in tqdm(loader, disable=True):
+    for images, labels in tqdm(loader, disable=True):
         total_human0 += len(labels) - labels.sum()
         total_human1 += labels.sum()
-        
+    
         images, labels = images.to(device), labels.to(device)
-        
-        pred_mem, _ = checker.check_liveness(images)
-        # mistakes_ad = check_mistakes(pred_ads, labels.numpy())
-        mistakes_mem = check_mistakes(pred_mem, labels.cpu().numpy())
-        # mistakes_total = check_mistakes(np.logical_and(pred_mem, pred_ads), labels.numpy())
-        mistakes_total = mistakes_mem
-        # mistakes_ad0 += mistakes_ad[0]
-        # mistakes_ad1 += mistakes_ad[1]
-        mistakes_mem0 += mistakes_mem[0]
-        mistakes_mem1 += mistakes_mem[1]
-        mistakes_human0 += mistakes_total[0]
-        mistakes_human1 += mistakes_total[1]
+    
+        pred = checker.check_liveness(images)
+        mistakes = check_mistakes(pred, labels.cpu().numpy())
+        mistakes_human0 += mistakes[0]
+        mistakes_human1 += mistakes[1]
     
     print('total pictures {} with {:.5%} correct'.format(
         total_human0 + total_human1,
@@ -114,19 +103,12 @@ def main():
     if total_human0 != 0:
         print('not human correct {:.5%}'.format(1 - mistakes_human0 / total_human0))
     
-    print('ad model {} mistakes out of {} on fake'.format(mistakes_ad0, total_human0))
-    print('ad model {} mistakes out of {} on real'.format(mistakes_ad1, total_human1))
-    print('mem model {} mistakes out of {} on fake'.format(mistakes_mem0, total_human0))
-    print('mem model {} mistakes out of {} on real'.format(mistakes_mem1, total_human1))
-    
     if argv.count_time:
         print('total time: {:.5f} seconds'.format(time.perf_counter() - global_start))
     
     pd.DataFrame({'model': argv.model_name,
-                  'fake_ad': 100 * mistakes_ad0 / total_human0,
-                  'fake_mem': 100 * mistakes_mem0 / total_human0,
-                  'real_ad': 100 * mistakes_ad1 / total_human1,
-                  'real_mem': 100 * mistakes_mem1 / total_human1,
+                  'real': 100 * mistakes_human1 / total_human1,
+                  'fake': 100 * mistakes_human0 / total_human1,
                   'total_time': time.perf_counter() - global_start}).to_csv('results.csv', mode='a', header=False)
 
 

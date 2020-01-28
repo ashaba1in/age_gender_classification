@@ -8,7 +8,7 @@ import pandas as pd
 import torch
 import torch.multiprocessing
 import torch.nn as nn
-import torch.utils.data.dataset as dataset
+import torch.utils.data
 import torchvision
 import torchvision.transforms as transforms
 from PIL import Image
@@ -43,55 +43,55 @@ class Model:
         
         if model_name in possible_names:
             if model_name == 'ResNet-18':
-                model = torchvision.models.resnet18(pretrained=True)
+                model = torchvision.models.resnet18(pretrained=False)
                 model.pool0 = Identity()
                 model.fc = nn.Linear(model.fc.in_features, NUM_CLASSES)
             elif model_name == 'ResNet-34':
-                model = torchvision.models.resnet34(pretrained=True)
+                model = torchvision.models.resnet34(pretrained=False)
                 model.pool0 = Identity()
                 model.fc = nn.Linear(model.fc.in_features, NUM_CLASSES)
             elif model_name == 'ResNet-50':
-                model = torchvision.models.resnet50(pretrained=True)
+                model = torchvision.models.resnet50(pretrained=False)
                 model.pool0 = Identity()
                 model.fc = nn.Linear(model.fc.in_features, NUM_CLASSES)
             elif model_name == 'ResNet-101':
-                model = torchvision.models.resnet101(pretrained=True)
+                model = torchvision.models.resnet101(pretrained=False)
                 model.pool0 = Identity()
                 model.fc = nn.Linear(model.fc.in_features, NUM_CLASSES)
             elif model_name == 'ResNet-152':
-                model = torchvision.models.resnet152(pretrained=True)
+                model = torchvision.models.resnet152(pretrained=False)
                 model.pool0 = Identity()
                 model.fc = nn.Linear(model.fc.in_features, NUM_CLASSES)
             elif model_name == 'ResNeXt-50-32x4d':
-                model = torchvision.models.resnext50_32x4d(pretrained=True)
+                model = torchvision.models.resnext50_32x4d(pretrained=False)
                 model.pool0 = Identity()
                 model.fc = nn.Linear(model.fc.in_features, NUM_CLASSES)
             elif model_name == 'ResNeXt-101-32x8d':
-                model = torchvision.models.resnext101_32x8d(pretrained=True)
+                model = torchvision.models.resnext101_32x8d(pretrained=False)
                 model.pool0 = Identity()
                 model.fc = nn.Linear(model.fc.in_features, NUM_CLASSES)
             elif model_name == 'WideResNet-50-2':
-                model = torchvision.models.wide_resnet50_2(pretrained=True)
+                model = torchvision.models.wide_resnet50_2(pretrained=False)
                 model.pool0 = Identity()
                 model.fc = nn.Linear(model.fc.in_features, NUM_CLASSES)
             elif model_name == 'WideResNet-101-2':
-                model = torchvision.models.wide_resnet101_2(pretrained=True)
+                model = torchvision.models.wide_resnet101_2(pretrained=False)
                 model.pool0 = Identity()
                 model.fc = nn.Linear(model.fc.in_features, NUM_CLASSES)
             elif model_name == 'Densenet-121':
-                model = torchvision.models.densenet121(pretrained=True)
+                model = torchvision.models.densenet121(pretrained=False)
                 model.features.pool0 = Identity()
                 model.fc = nn.Linear(model.classifier.in_features, NUM_CLASSES)
             elif model_name == 'Densenet-169':
-                model = torchvision.models.densenet169(pretrained=True)
+                model = torchvision.models.densenet169(pretrained=False)
                 model.features.pool0 = Identity()
                 model.fc = nn.Linear(model.classifier.in_features, NUM_CLASSES)
             elif model_name == 'Densenet-201':
-                model = torchvision.models.densenet201(pretrained=True)
+                model = torchvision.models.densenet201(pretrained=False)
                 model.features.pool0 = Identity()
                 model.fc = nn.Linear(model.classifier.in_features, NUM_CLASSES)
             elif model_name == 'Densenet-161':
-                model = torchvision.models.densenet161(pretrained=True)
+                model = torchvision.models.densenet161(pretrained=False)
                 model.features.pool0 = Identity()
                 model.fc = nn.Linear(model.classifier.in_features, NUM_CLASSES)
         
@@ -109,46 +109,6 @@ class LivenessChecker:
     
     def check_liveness(self, image):
         return self.model.predict(image)
-
-
-class ImageDataset(dataset):
-    def __init__(self, dataframe: pd.DataFrame, mode: str) -> None:
-        self.df = dataframe
-        self.mode = mode
-        image_size = 100
-        
-        transforms_list = []
-        
-        if self.mode == 'train':
-            transforms_list.extend([
-                transforms.RandomChoice([
-                    transforms.ColorJitter(0.5, 0.5, 0.5, 0.5),
-                    transforms.RandomAffine(degrees=20, translate=(0.05, 0.05), scale=(0.7, 1.3), shear=10),
-                    transforms.RandomHorizontalFlip(),
-                    transforms.RandomGrayscale(0.05)
-                ])
-            ])
-        
-        transforms_list.extend([
-            transforms.Resize((image_size, image_size)),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-        ])
-        
-        self.transforms = transforms.Compose(transforms_list)
-        self.targets = dataframe['target'].values
-    
-    def __getitem__(self, index: int) -> Any:
-        filename = self.df['filename'].values[index]
-        sample = Image.open(filename)
-        assert sample.mode == 'RGB'
-        image = self.transforms(sample)
-        if self.mode == 'debug':
-            return image, self.df['target'].values[index], filename
-        return image, self.df['target'].values[index]
-    
-    def __len__(self) -> int:
-        return self.df.shape[0]
 
 
 class FaceHandler:
@@ -226,9 +186,50 @@ class FaceHandler:
                 x2 = 0
             if y2 < 0:
                 y2 = 0
-            
+
             if x2 - x1 > 0 and y2 - y1 > 0:
                 self.align(image, rect.rect).save(
                     os.path.join(self.save_path, '_'.join(['face', str(int(human)), str(total + i)])) + '.' + ext
                 )
         return total + len(rects)
+
+
+class ImageDataset(torch.utils.data.Dataset):
+    def __init__(self, dataframe: pd.DataFrame, mode: str) -> None:
+        super(ImageDataset, self).__init__()
+        self.df = dataframe
+        self.mode = mode
+        image_size = 100
+        
+        transforms_list = []
+        
+        if self.mode == 'train':
+            transforms_list.extend([
+                transforms.RandomChoice([
+                    transforms.ColorJitter(0.5, 0.5, 0.5, 0.5),
+                    transforms.RandomAffine(degrees=20, translate=(0.05, 0.05), scale=(0.7, 1.3), shear=10),
+                    transforms.RandomHorizontalFlip(),
+                    transforms.RandomGrayscale(0.05)
+                ])
+            ])
+        
+        transforms_list.extend([
+            transforms.Resize((image_size, image_size)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ])
+        
+        self.transforms = transforms.Compose(transforms_list)
+        self.targets = dataframe['target'].values
+    
+    def __getitem__(self, index: int) -> Any:
+        filename = self.df['filename'].values[index]
+        sample = Image.open(filename)
+        assert sample.mode == 'RGB'
+        image = self.transforms(sample)
+        if self.mode == 'debug':
+            return image, self.df['target'].values[index], filename
+        return image, self.df['target'].values[index]
+    
+    def __len__(self) -> int:
+        return self.df.shape[0]
