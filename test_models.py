@@ -2,51 +2,23 @@ import argparse
 import multiprocessing
 import os
 import time
-from typing import Any
 
 import magic
 import numpy as np
 import pandas as pd
 import torch
 import torch.backends.cudnn as cudnn
-import torchvision.transforms as transforms
-from PIL import Image
-from checker import LivenessChecker
-from torch.utils.data import TensorDataset, DataLoader
+import torch.multiprocessing
+from torch.utils.data import DataLoader
 from tqdm import tqdm
+
+from .classes import ImageDataset, LivenessChecker
 
 IMAGE_SIZE = 100
 PADDING_SIZE = 4
 BATCH_SIZE = 256
 NUM_CLASSES = 2
 NUM_WORKERS = multiprocessing.cpu_count()
-
-
-class ImageDataset(torch.utils.data.Dataset):
-    def __init__(self, dataframe: pd.DataFrame) -> None:
-        self.df = dataframe
-        
-        transforms_list = [
-            transforms.Resize((IMAGE_SIZE - PADDING_SIZE, IMAGE_SIZE - PADDING_SIZE)),
-            transforms.Pad(PADDING_SIZE, padding_mode='constant'),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                 std=[0.229, 0.224, 0.225])
-        ]
-        
-        self.transforms = transforms.Compose(transforms_list)
-        self.targets = dataframe['target'].values
-    
-    def __getitem__(self, index: int) -> Any:
-        filename = self.df['filename'].values[index]
-        sample = Image.open(filename)
-        assert sample.mode == 'RGB'
-        image = self.transforms(sample)
-        
-        return image, self.df['target'].values[index], filename
-    
-    def __len__(self) -> int:
-        return self.df.shape[0]
 
 
 def get_argv():
@@ -96,9 +68,9 @@ def main():
     torch.backends.cudnn.benchmark = True
     torch.multiprocessing.set_sharing_strategy('file_system')
     cudnn.benchmark = True
-    
+
     argv = get_argv()
-    checker = LivenessChecker(path1='model_{}.pth'.format(argv.model_name), debug=True, device=device)
+    checker = LivenessChecker(path='model_{}.pth'.format(argv.model_name), device=device)
     
     global_start = 0
     if argv.count_time:

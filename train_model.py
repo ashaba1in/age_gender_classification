@@ -2,24 +2,25 @@ import argparse
 import gc
 import multiprocessing
 import os
-from typing import Any, Tuple
+from typing import Tuple
 
 import magic
 import matplotlib
 
 matplotlib.use('Agg')
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import torch
+import torch.multiprocessing
 import torch.backends.cudnn as cudnn
 import torch.nn as nn
-import torch.nn.functional as F
+import torch.nn.functional as f
 import torchvision
-import torchvision.transforms as transforms
-from PIL import Image
-from torch.utils.data import TensorDataset, DataLoader
+from torch.utils.data import DataLoader
+from .classes import ImageDataset
 
 sns.set(style='darkgrid')
 
@@ -40,41 +41,7 @@ torch.backends.cudnn.benchmark = True
 cudnn.benchmark = True
 
 
-class ImageDataset(torch.utils.data.Dataset):
-    def __init__(self, dataframe: pd.DataFrame) -> None:
-        self.df = dataframe
-        
-        transforms_list = [
-            transforms.RandomChoice([
-                transforms.RandomPerspective(),
-                transforms.RandomAffine(degrees=30, translate=(0.05, 0.05),
-                                        scale=(0.6, 1.4), shear=10)
-            ])
-        ]
-        
-        transforms_list.extend([
-            transforms.Resize((IMAGE_SIZE - PADDING_SIZE, IMAGE_SIZE - PADDING_SIZE)),
-            transforms.Pad(PADDING_SIZE, padding_mode='constant'),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                 std=[0.229, 0.224, 0.225])
-        ])
-        
-        self.transforms = transforms.Compose(transforms_list)
-        self.targets = dataframe['target'].values
-    
-    def __getitem__(self, index: int) -> Any:
-        filename = self.df['filename'].values[index]
-        sample = Image.open(filename)
-        assert sample.mode == 'RGB'
-        image = self.transforms(sample)
-        return image, self.df['target'].values[index]
-    
-    def __len__(self) -> int:
-        return self.df.shape[0]
-
-
-def get_filenames(path) -> Tuple[np.ndarray, np.ndarray]:
+def get_data(path) -> Tuple[np.ndarray, np.ndarray]:
     filenames = []
     target = []
     for root, _, files in os.walk(path):
@@ -86,11 +53,11 @@ def get_filenames(path) -> Tuple[np.ndarray, np.ndarray]:
 
 
 def load_data(path: str = 'faces/') -> DataLoader:
-    x, y = get_filenames(path)
+    x, y = get_data(path)
     
     df = pd.DataFrame(data={'filename': x, 'target': y})
     
-    loader = DataLoader(ImageDataset(df), batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
+    loader = DataLoader(ImageDataset(df, mode='train'), batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
     
     return loader
 
@@ -122,8 +89,8 @@ def evaluate(data_loader, model):
             images, labels = images.to(device), labels.to(device)
             
             outputs = model(images)
-            
-            loss += F.cross_entropy(outputs, labels, reduction='sum').item()
+
+            loss += f.cross_entropy(outputs, labels, reduction='sum').item()
             
             pred = outputs.data.max(1, keepdim=True)[1]
             

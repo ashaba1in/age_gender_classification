@@ -2,94 +2,12 @@ import argparse
 import os
 
 import cv2.cv2 as cv2
-import dlib
 import magic
 import numpy as np
 from PIL import Image
 from tqdm import tqdm
 
-
-class FaceHandler:
-    def __init__(self, args):
-        self.args = args
-        self.predictor = dlib.shape_predictor(args.get('predictor_path'))
-        self.detector = dlib.cnn_face_detection_model_v1(args.get('detector_path'))
-        self.save_path = args.get('save_path')
-        self.left_eye = args.get('left_eye')
-        self.face_width = args.get('face_width')
-        self.face_height = args.get('face_height')
-        self.eyes_slice = 5
-        
-        if self.face_width is None:
-            self.face_width = 256
-        if self.face_height is None:
-            self.face_height = self.face_width
-        if self.left_eye is None:
-            self.left_eye = 0.35, 0.35
-    
-    def eyes_pos(self, shape):
-        coords = np.empty((shape.num_parts, 2), dtype=int)
-        
-        for i in range(0, shape.num_parts):
-            coords[i] = (shape.part(i).x, shape.part(i).y)
-        
-        return coords[self.eyes_slice + 1:], coords[:self.eyes_slice]
-    
-    def align(self, image, rect):
-        shape = self.predictor(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY), rect)
-        leftEyePts, rightEyePts = self.eyes_pos(shape)
-        
-        leftEyeCenter = leftEyePts.mean(axis=0)
-        rightEyeCenter = rightEyePts.mean(axis=0)
-        
-        dY = rightEyeCenter[1] - leftEyeCenter[1]
-        dX = rightEyeCenter[0] - leftEyeCenter[0]
-        
-        angle = np.degrees(np.arctan2(dY, dX)) - 180
-        
-        desiredRightEyeX = 1.0 - self.left_eye[0]
-        
-        dist = np.sqrt((dX ** 2) + (dY ** 2))
-        desiredDist = (desiredRightEyeX - self.left_eye[0]) * self.face_width
-        scale = desiredDist / dist
-        
-        eyesCenter = (leftEyeCenter[0] + rightEyeCenter[0]) // 2, (leftEyeCenter[1] + rightEyeCenter[1]) // 2
-        
-        M = cv2.getRotationMatrix2D(eyesCenter, angle, scale)
-        
-        tX = self.face_width * 0.5
-        tY = self.face_height * self.left_eye[1]
-        
-        M[0, 2] += (tX - eyesCenter[0])
-        M[1, 2] += (tY - eyesCenter[1])
-        
-        size = self.face_width, self.face_height
-        
-        return Image.fromarray(cv2.warpAffine(image, M, size, flags=cv2.INTER_CUBIC), 'RGB')
-    
-    def process(self, image, args):
-        human = args.get('human')
-        total = args.get('total')
-        ext = args.get('ext')
-        rects = self.detector(image, 0)
-        for i, rect in enumerate(rects):
-            x1, y1 = rect.rect.left(), rect.rect.top()
-            x2, y2 = rect.rect.right() + 1, rect.rect.bottom() + 1
-            
-            if x1 < 0:
-                x1 = 0
-            if y1 < 0:
-                y1 = 0
-            if x2 < 0:
-                x2 = 0
-            if y2 < 0:
-                y2 = 0
-            
-            if x2 - x1 > 0 and y2 - y1 > 0:
-                self.align(image, rect.rect).save(
-                    os.path.join(self.save_path, '_'.join(['face', str(int(human)), str(total + i)])) + '.' + ext
-                )
-        return total + len(rects)
+from .classes import FaceHandler
 
 
 def get_filenames(path):
