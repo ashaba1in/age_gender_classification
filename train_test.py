@@ -7,6 +7,6 @@ possible_names = ['ResNet-18', 'ResNeXt-101-32x8d', 'WideResNet-101-2', 'WideRes
 for name in possible_names:
     print('-' * 100)
     print('training {}'.format(name))
-    os.system('python3 train_models.py --model_name {} --image_path {} --epochs'.format(name, '', 64))
+    os.system('python3 train_models.py --model_name {} --image_path {} --epochs'.format(name, 'aligned/', 64))
     print('testing {}'.format(name))
     os.system('python3 test_models.py --image_path {} --model_name {}'.format('faces2/', name))

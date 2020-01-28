@@ -111,7 +111,7 @@ def evaluate(data_loader, model):
 def get_argv():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     
-    parser.add_argument('--image_path', type=str, default='faces/')
+    parser.add_argument('--image_path', type=str)
     parser.add_argument('--epochs', type=int, default=NUM_EPOCHS)
     parser.add_argument('--model_name', type=str)
     

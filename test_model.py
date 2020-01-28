@@ -70,7 +70,7 @@ def main():
     cudnn.benchmark = True
 
     argv = get_argv()
-    checker = LivenessChecker(path='{}.pth'.format(argv.model_name), device=device)
+    checker = LivenessChecker(path='models_data/{}.pth'.format(argv.model_name), device=device)
     
     global_start = 0
     if argv.count_time:
