@@ -14,7 +14,7 @@ import torchvision.transforms as transforms
 from PIL import Image
 
 
-class ModelMem:
+class Model:
     def __init__(self, device=None):
         self.est = None
         self.device = device
@@ -104,8 +104,8 @@ class ModelMem:
 
 
 class LivenessChecker:
-    def __init__(self, path: str = 'model.pth', device=None):
-        self.model = ModelMem(device).load_est(path)
+    def __init__(self, path: str = 'Densenet-121.pth', device=None):
+        self.model = Model(device).load_est(path)
     
     def check_liveness(self, image):
         return self.model.predict(image)
