@@ -84,7 +84,7 @@ def main():
     mistakes_ad0 = 0
     mistakes_ad1 = 0
     x, y = get_data(get_filenames(argv.image_path))
-    dataset = ImageDataset(pd.DataFrame(data={'filename': x, 'target': y}))
+    dataset = ImageDataset(pd.DataFrame(data={'filename': x, 'target': y}), mode='test')
     loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
     
     for images, labels, filenames in tqdm(loader, disable=True):
