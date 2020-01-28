@@ -12,7 +12,7 @@ import torch.multiprocessing
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from .classes import ImageDataset, LivenessChecker
+from classes import ImageDataset, LivenessChecker
 
 IMAGE_SIZE = 100
 PADDING_SIZE = 4
