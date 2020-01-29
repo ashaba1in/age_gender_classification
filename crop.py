@@ -1,5 +1,6 @@
 import argparse
 import os
+from warnings import filterwarnings
 
 import magic
 import numpy as np
@@ -7,6 +8,8 @@ from PIL import Image
 from tqdm import tqdm
 
 from classes import FaceHandler
+
+filterwarnings('ignore')
 
 
 def get_filenames(path):
@@ -50,33 +53,33 @@ def main():
     print('Total files found {}'.format(len(filenames)))
     
     total = 0
-    
+
     for filename in tqdm(filenames):
-        if magic.from_file(filename, mime=True).split('/')[0] != 'image':
-            pass
-
-        im = Image.open(filename)
-
+        try:
+            im = Image.open(filename)
+        except OSError:
+            continue
+    
         ratio = float(desired_size) / max(im.size)
         new_size = tuple([int(x * ratio) for x in im.size])
-
+    
         im = im.resize(new_size, Image.ANTIALIAS)
-
+    
         new_im = Image.new('RGB', (desired_size, desired_size))
         new_im.paste(im, ((desired_size - new_size[0]) // 2,
                           (desired_size - new_size[1]) // 2))
-
+    
         image = np.asarray(new_im)
-
+    
         if image.shape[0] == 0 or image.shape[1] == 0:
-            pass
-
+            continue
+    
         tmp_args = {
             'human': args.get('human'),
             'total': total,
             'ext': magic.from_file(filename, mime=True).split('/')[1]
         }
-
+    
         total = fh.process(image, tmp_args)
     
     print('Total faces {}'.format(total))
