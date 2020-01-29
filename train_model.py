@@ -30,7 +30,7 @@ PADDING_SIZE = 4
 LEARNING_RATE = 1e-4
 LR_STEP = 16
 LR_FACTOR = 0.1
-BATCH_SIZE = 64
+BATCH_SIZE = 4096
 NUM_CLASSES = 2
 NUM_WORKERS = multiprocessing.cpu_count()
 NUM_EPOCHS = 2 ** 6
@@ -123,6 +123,7 @@ def main():
     argv = get_argv()
     model_name = argv.model_name
     model = None
+    global BATCH_SIZE
     
     possible_names = ['ResNeXt-101-32x8d', 'WideResNet-101-2', 'WideResNet-50-2', 'ResNet-152', 'Densenet-161',
                       'ResNeXt-50-32x4d', 'ResNet-101', 'Densenet-201', 'ResNet-50', 'Densenet-169',
@@ -193,23 +194,34 @@ def main():
     gc.collect()
     
     model.to(device)
-    
+
     criterion = nn.CrossEntropyLoss()
-    
+
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=LR_STEP,
                                                    gamma=LR_FACTOR)
-    
+
     history = []
+    epoch = 0
+
+    while epoch < argv.epochs:
+        try:
+            train(loader, model, optimizer, criterion)
+            epoch += 1
+        except RuntimeError:
+            print('Batch size {} too large :D'.format(BATCH_SIZE))
+            BATCH_SIZE //= 2
+            loader = load_data(argv.image_path)
+            continue
     
-    for epoch in range(argv.epochs):
-        train(loader, model, optimizer, criterion)
         history.append(evaluate(loader, model))
+    
         lr_scheduler.step(epoch)
         torch.save(model.state_dict(), 'models_data/{}.pth'.format(model_name))
-    
+        print('Epoch {} finished'.format(epoch))
+
     history = np.array(history)
-    
+
     plt.figure(figsize=(15, 15))
     plt.title('loss model {}'.format(model_name))
     plt.plot(history[:, 0], marker='.')
