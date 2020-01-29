@@ -116,6 +116,7 @@ class FaceHandler:
         self.args = args
         self.predictor = dlib.shape_predictor(args.get('predictor_path'))
         self.detector = dlib.cnn_face_detection_model_v1(args.get('detector_path'))
+        self.detect_face = args.get('detect_face')
         self.save_path = args.get('save_path')
         self.left_eye = args.get('left_eye')
         self.face_width = args.get('face_width')
@@ -173,11 +174,31 @@ class FaceHandler:
         human = args.get('human')
         total = args.get('total')
         ext = args.get('ext')
-        rects = self.detector(image, 0)
-        for i, rect in enumerate(rects):
-            x1, y1 = rect.rect.left(), rect.rect.top()
-            x2, y2 = rect.rect.right() + 1, rect.rect.bottom() + 1
+        if self.detect_face:
+            rects = self.detector(image, 0)
+            for i, rect in enumerate(rects):
+                x1, y1 = rect.rect.left(), rect.rect.top()
+                x2, y2 = rect.rect.right() + 1, rect.rect.bottom() + 1
             
+                if x1 < 0:
+                    x1 = 0
+                if y1 < 0:
+                    y1 = 0
+                if x2 < 0:
+                    x2 = 0
+                if y2 < 0:
+                    y2 = 0
+            
+                if x2 - x1 > 0 and y2 - y1 > 0:
+                    self.align(image, rect.rect).save(
+                        os.path.join(self.save_path, '_'.join(['face', str(int(human)), str(total + i)])) + '.' + ext
+                    )
+            return total + len(rects)
+        else:
+            rect = dlib.rectangle(0, 0, image.shape[0], image.shape[1])
+            x1, y1 = rect.left(), rect.top()
+            x2, y2 = rect.right() + 1, rect.bottom() + 1
+        
             if x1 < 0:
                 x1 = 0
             if y1 < 0:
@@ -186,12 +207,12 @@ class FaceHandler:
                 x2 = 0
             if y2 < 0:
                 y2 = 0
-
+        
             if x2 - x1 > 0 and y2 - y1 > 0:
-                self.align(image, rect.rect).save(
-                    os.path.join(self.save_path, '_'.join(['face', str(int(human)), str(total + i)])) + '.' + ext
+                self.align(image, rect).save(
+                    os.path.join(self.save_path, '_'.join(['face', str(int(human)), str(total)])) + '.' + ext
                 )
-        return total + len(rects)
+            return total + 1
 
 
 class ImageDataset(torch.utils.data.Dataset):

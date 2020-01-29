@@ -4,8 +4,9 @@ import os
 import magic
 import numpy as np
 from PIL import Image
-from classes import FaceHandler
 from tqdm import tqdm
+
+from classes import FaceHandler
 
 
 def get_filenames(path):
@@ -23,7 +24,7 @@ def get_argv():
     parser.add_argument('--save_path', type=str)
     parser.add_argument('--predictor_path', type=str, default='data/eye.dat')
     parser.add_argument('--detector_path', type=str, default='data/face.dat')
-    parser.add_argument('--detect_face', type=bool, default=True)
+    parser.add_argument('--detect_face', type=int)
     parser.add_argument('--face_width', type=int)
     parser.add_argument('--human', type=int)
     
