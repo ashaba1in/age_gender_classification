@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from tqdm import tqdm
 import torch
 import torch.multiprocessing
 import torch.backends.cudnn as cudnn
@@ -192,7 +193,7 @@ def main():
     
     loader = load_data(argv.image_path)
     gc.collect()
-    
+
     model.to(device)
 
     criterion = nn.CrossEntropyLoss()
@@ -203,6 +204,7 @@ def main():
 
     history = []
     epoch = 0
+    bar = tqdm(total=argv.epochs)
 
     while epoch < argv.epochs:
         try:
@@ -218,7 +220,7 @@ def main():
     
         lr_scheduler.step(epoch)
         torch.save(model.state_dict(), 'models_data/{}.pth'.format(model_name))
-        print('Epoch {} finished'.format(epoch))
+        bar.update(1)
 
     history = np.array(history)
 
@@ -226,7 +228,7 @@ def main():
     plt.title('loss model {}'.format(model_name))
     plt.plot(history[:, 0], marker='.')
     plt.savefig('models_data/loss_{}.png'.format(model_name))
-    
+
     plt.figure(figsize=(15, 15))
     plt.title('accuracy on fake and real')
     plt.plot(history[:, 2], marker='.', label='real')
