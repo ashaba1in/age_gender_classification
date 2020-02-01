@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.14159265-2.6-1.40.20 (TeX Live 2019/Debian) (preloaded format=pdflatex 2019.10.27)  30 JAN 2020 18:04
+This is pdfTeX, Version 3.14159265-2.6-1.40.20 (TeX Live 2019/Debian) (preloaded format=pdflatex 2019.10.27)  1 FEB 2020 17:32
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -900,24 +900,24 @@ File: t2acmr.fd 2001/08/11 v1.0a Computer Modern Cyrillic font definitions
 ))
 \openout1 = `coursework.aux'.
 
-LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 45.
-LaTeX Font Info:    ... okay on input line 45.
-LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 45.
-LaTeX Font Info:    ... okay on input line 45.
-LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 45.
-LaTeX Font Info:    ... okay on input line 45.
-LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 45.
-LaTeX Font Info:    ... okay on input line 45.
-LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 45.
-LaTeX Font Info:    ... okay on input line 45.
-LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 45.
-LaTeX Font Info:    ... okay on input line 45.
-LaTeX Font Info:    Checking defaults for T2A/cmr/m/n on input line 45.
-LaTeX Font Info:    ... okay on input line 45.
-LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 45.
-LaTeX Font Info:    ... okay on input line 45.
-LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 45.
-LaTeX Font Info:    ... okay on input line 45.
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 47.
+LaTeX Font Info:    ... okay on input line 47.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 47.
+LaTeX Font Info:    ... okay on input line 47.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 47.
+LaTeX Font Info:    ... okay on input line 47.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 47.
+LaTeX Font Info:    ... okay on input line 47.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 47.
+LaTeX Font Info:    ... okay on input line 47.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 47.
+LaTeX Font Info:    ... okay on input line 47.
+LaTeX Font Info:    Checking defaults for T2A/cmr/m/n on input line 47.
+LaTeX Font Info:    ... okay on input line 47.
+LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 47.
+LaTeX Font Info:    ... okay on input line 47.
+LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 47.
+LaTeX Font Info:    ... okay on input line 47.
 *geometry* driver: auto-detecting
 *geometry* detected driver: pdftex
 *geometry* verbose mode - [ preamble ] result:
@@ -989,7 +989,7 @@ Package caption Info: listings package is loaded.
 Package caption Info: End \AtBeginDocument code.
 \c@lstlisting=\count154
 \AtBeginShipoutBox=\box45
-Package hyperref Info: Link coloring ON on input line 45.
+Package hyperref Info: Link coloring ON on input line 47.
 
 (/usr/share/texlive/texmf-dist/tex/latex/hyperref/nameref.sty
 Package: nameref 2016/05/21 v2.44 Cross-referencing by name of section
@@ -999,34 +999,34 @@ Package: gettitlestring 2016/05/16 v1.5 Cleanup title references (HO)
 )
 \c@section@level=\count155
 )
-LaTeX Info: Redefining \ref on input line 45.
-LaTeX Info: Redefining \pageref on input line 45.
-LaTeX Info: Redefining \nameref on input line 45.
+LaTeX Info: Redefining \ref on input line 47.
+LaTeX Info: Redefining \pageref on input line 47.
+LaTeX Info: Redefining \nameref on input line 47.
 
 (./coursework.out) (./coursework.out)
 \@outlinefile=\write4
 \openout4 = `coursework.out'.
 
  (./title.tex
-Underfull \hbox (badness 10000) in paragraph at lines 41--41
+Underfull \hbox (badness 10000) in paragraph at lines 42--42
 
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 41--41
+Underfull \hbox (badness 10000) in paragraph at lines 42--42
 
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 41--41
+Underfull \hbox (badness 10000) in paragraph at lines 42--42
 
  []
 
-LaTeX Font Info:    Try loading font information for U+msa on input line 41.
+LaTeX Font Info:    Try loading font information for U+msa on input line 42.
 (/usr/share/texlive/texmf-dist/tex/latex/amsfonts/umsa.fd
 File: umsa.fd 2013/01/14 v3.01 AMS symbols A
 )
-LaTeX Font Info:    Try loading font information for U+msb on input line 41.
+LaTeX Font Info:    Try loading font information for U+msb on input line 42.
 
 (/usr/share/texlive/texmf-dist/tex/latex/amsfonts/umsb.fd
 File: umsb.fd 2013/01/14 v3.01 AMS symbols B
@@ -1040,54 +1040,106 @@ pdfTeX warning (ext4): destination with the same identifier (name{page.1}) has
 been already used, duplicate ignored
 <to be read again> 
                    \relax 
-l.54 \newpage
-              [1]
-Underfull \hbox (badness 10000) in paragraph at lines 57--60
+l.56     \newpage
+                  [1]
+Underfull \hbox (badness 10000) in paragraph at lines 59--62
 
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 61--65
+Underfull \hbox (badness 10000) in paragraph at lines 63--67
 
  []
 
-[2] [3] [4] [5] [6]
-Underfull \hbox (badness 2600) in paragraph at lines 110--111
-[][][]\T2A/cmr/m/n/14.4 Ankita Shukla, Gullal Singh Cheema, Saket Anand, Qamar 
-Qureshi,
+[2] [3] [4]
+Overfull \hbox (2.75594pt too wide) in paragraph at lines 83--84
+\T2A/cmr/m/n/14.4 тек-то-ров, обу-чен-ных ал-го-рит-мом AdaBoost. В 2014 го-ду 
+в ста-тье [][]Face detection
  []
 
-[7]
-Package atveryend Info: Empty hook `BeforeClearDocument' on input line 120.
-Package atveryend Info: Empty hook `AfterLastShipout' on input line 120.
+
+Overfull \hbox (18.13791pt too wide) in paragraph at lines 83--84
+\T2A/cmr/m/n/14.4 without bells and whistles (2014)[][] был пред-ло-жен ме-тод,
+ ис-поль-зу-ю-щий Deformable
+ []
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `\leavevmode@ifvmode' on input line 85.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                \kern 2.28499pt
+(hyperref)                removed on input line 85.
+
+[5] [6]
+Overfull \hbox (5.12222pt too wide) in paragraph at lines 90--91
+\T2A/cmr/m/n/14.4 тей ис-поль-зу-ют-ся ней-рон-ные се-ти ар-хи-тек-ту-ры ResNet
+ ([][]Deep Residual Learning
+ []
+
+[7] [8] [9]
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `\leavevmode@ifvmode' on input line 100.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                \kern 2.28499pt
+(hyperref)                removed on input line 100.
+
+[10] [11] [12] [13] [14]
+Overfull \hbox (20.09735pt too wide) in paragraph at lines 131--131
+[]\T2A/cmr/bx/n/20.74 Классификация ген-дер-ных и воз-раст-ных групп 
+ []
+
+[15]
+Underfull \hbox (badness 1394) in paragraph at lines 170--171
+[][][]\T2A/cmr/m/n/14.4 Densely Connected Convolutional Networks. Gao Huang, Zh
+uang Liu,
+ []
+
+[16] [17]
+Package atveryend Info: Empty hook `BeforeClearDocument' on input line 197.
+Package atveryend Info: Empty hook `AfterLastShipout' on input line 197.
  (./coursework.aux)
-Package atveryend Info: Executing hook `AtVeryEndDocument' on input line 120.
-Package atveryend Info: Executing hook `AtEndAfterFileList' on input line 120.
+Package atveryend Info: Executing hook `AtVeryEndDocument' on input line 197.
+Package atveryend Info: Executing hook `AtEndAfterFileList' on input line 197.
 Package rerunfilecheck Info: File `coursework.out' has not changed.
-(rerunfilecheck)             Checksum: 0075E6EDA5453F76DC3DA931D6FFD720;2078.
-Package atveryend Info: Empty hook `AtVeryVeryEnd' on input line 120.
+(rerunfilecheck)             Checksum: 73CDFCA9B1CA220F6EB51196171D2079;3777.
+Package atveryend Info: Empty hook `AtVeryVeryEnd' on input line 197.
  ) 
 Here is how much of TeX's memory you used:
- 23718 strings out of 493986
- 409206 string characters out of 6167907
- 472452 words of memory out of 5000000
- 27008 multiletter control sequences out of 15000+600000
+ 23791 strings out of 493986
+ 409947 string characters out of 6167907
+ 473878 words of memory out of 5000000
+ 27033 multiletter control sequences out of 15000+600000
  15975 words of font info for 37 fonts, out of 8000000 for 9000
  452 hyphenation exceptions out of 8191
- 55i,5n,48p,1984b,464s stack positions out of 5000i,500n,10000p,200000b,80000s
- </home/lesha/.texlive2019/texmf-var/fonts/pk/ljfour/lh/lh-t2a/labx1728.600pk
-> </home/lesha/.texlive2019/texmf-var/fonts/pk/ljfour/lh/lh-t2a/labi1200.600pk>
- </home/lesha/.texlive2019/texmf-var/fonts/pk/ljfour/lh/lh-t2a/larm1200.600pk> 
-</home/lesha/.texlive2019/texmf-var/fonts/pk/ljfour/lh/lh-t2a/labx1200.600pk> <
-/home/lesha/.texlive2019/texmf-var/fonts/pk/ljfour/lh/lh-t2a/labx1440.600pk> </
-home/lesha/.texlive2019/texmf-var/fonts/pk/ljfour/lh/lh-t2a/labx2074.600pk> </h
-ome/lesha/.texlive2019/texmf-var/fonts/pk/ljfour/lh/lh-t2a/laxc1440.600pk> </ho
-me/lesha/.texlive2019/texmf-var/fonts/pk/ljfour/lh/lh-t2a/larm2074.600pk> </hom
-e/lesha/.texlive2019/texmf-var/fonts/pk/ljfour/lh/lh-t2a/larm1440.600pk>
-Output written on coursework.pdf (8 pages, 140453 bytes).
+ 55i,6n,48p,1876b,464s stack positions out of 5000i,500n,10000p,200000b,80000s
+pdfTeX warning (dest): name{lbp3} has been referenced but does not exist, rep
+laced by a fixed one
+
+pdfTeX warning (dest): name{lbp2} has been referenced but does not exist, repla
+ced by a fixed one
+
+pdfTeX warning (dest): name{lbp} has been referenced but does not exist, replac
+ed by a fixed one
+
+ </home/lesha/.texlive2019/texmf-var/fonts/pk/ljfour/lh/lh-t2a/labx1728.600pk> 
+</home/lesha/.texlive2019/texmf-var/fonts/pk/ljfour/lh/lh-t2a/labi1200.600pk> <
+/home/lesha/.texlive2019/texmf-var/fonts/pk/ljfour/lh/lh-t2a/larm1200.600pk> </
+home/lesha/.texlive2019/texmf-var/fonts/pk/ljfour/lh/lh-t2a/labx1200.600pk> </h
+ome/lesha/.texlive2019/texmf-var/fonts/pk/ljfour/lh/lh-t2a/labx1440.600pk> </ho
+me/lesha/.texlive2019/texmf-var/fonts/pk/ljfour/lh/lh-t2a/labx2074.600pk> </hom
+e/lesha/.texlive2019/texmf-var/fonts/pk/ljfour/lh/lh-t2a/laxc1440.600pk> </home
+/lesha/.texlive2019/texmf-var/fonts/pk/ljfour/lh/lh-t2a/larm2074.600pk> </home/
+lesha/.texlive2019/texmf-var/fonts/pk/ljfour/lh/lh-t2a/larm1440.600pk></usr/sha
+re/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb>
+Output written on coursework.pdf (18 pages, 174231 bytes).
 PDF statistics:
- 527 PDF objects out of 1000 (max. 8388607)
- 144 compressed objects within 2 object streams
- 28 named destinations out of 1000 (max. 500000)
- 77 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 740 PDF objects out of 1000 (max. 8388607)
+ 323 compressed objects within 4 object streams
+ 76 named destinations out of 1000 (max. 500000)
+ 141 words of extra memory for PDF output out of 10000 (max. 10000000)
 

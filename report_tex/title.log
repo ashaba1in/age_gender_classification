@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.14159265-2.6-1.40.20 (TeX Live 2019/Debian) (preloaded format=pdflatex 2019.10.27)  30 JAN 2020 14:51
+This is pdfTeX, Version 3.14159265-2.6-1.40.20 (TeX Live 2019/Debian) (preloaded format=pdflatex 2019.10.27)  1 FEB 2020 11:30
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -19,8 +19,8 @@ Type  I <command> <return>  to replace it with another command,
 or  <return>  to continue without it.
 
 ! Undefined control sequence.
-l.4 {\setstretch
-                {1.0}
+l.4     {\setstretch
+                    {1.0}
 The control sequence at the end of the top line
 of your error message was never \def'ed. If you have
 misspelled it (e.g., `\hobx'), type `I' and the correct
@@ -34,8 +34,8 @@ See the LaTeX manual or LaTeX Companion for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.4 {\setstretch{1
-                  .0}
+l.4     {\setstretch{1
+                      .0}
 You're in trouble here.  Try typing  <return>  to proceed.
 If that doesn't work, type  X <return>  to quit.
 
@@ -55,8 +55,8 @@ See the inputenc package documentation for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.6 Ф
-      едеральное государственное автономно...
+l.6         Ф
+              едеральное государственное автон...
 
 You may provide a definition with
 \DeclareUnicodeCharacter 
@@ -69,8 +69,8 @@ See the inputenc package documentation for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.6 Фе
-        деральное государственное автономно...
+l.6         Фе
+                деральное государственное автон...
 
 You may provide a definition with
 \DeclareUnicodeCharacter 
@@ -83,8 +83,8 @@ See the inputenc package documentation for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.6 Фед
-          еральное государственное автономно...
+l.6         Фед
+                  еральное государственное автон...
 
 You may provide a definition with
 \DeclareUnicodeCharacter 
@@ -97,8 +97,8 @@ See the inputenc package documentation for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.6 Феде
-            ральное государственное автономно...
+l.6         Феде
+                    ральное государственное автон...
 
 You may provide a definition with
 \DeclareUnicodeCharacter 
@@ -111,8 +111,8 @@ See the inputenc package documentation for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.6 Федер
-              альное государственное автономно...
+l.6         Федер
+                      альное государственное автон...
 
 You may provide a definition with
 \DeclareUnicodeCharacter 
@@ -125,8 +125,8 @@ See the inputenc package documentation for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.6 Федера
-                льное государственное автономно...
+l.6         Федера
+                        льное государственное автон...
 
 You may provide a definition with
 \DeclareUnicodeCharacter 
@@ -139,8 +139,8 @@ See the inputenc package documentation for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.6 Федерал
-                  ьное государственное автономно...
+l.6         Федерал
+                          ьное государственное автон...
 
 You may provide a definition with
 \DeclareUnicodeCharacter 
@@ -153,8 +153,8 @@ See the inputenc package documentation for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.6 Федераль
-                    ное государственное автономно...
+l.6         Федераль
+                            ное государственное автон...
 
 You may provide a definition with
 \DeclareUnicodeCharacter 
@@ -167,8 +167,8 @@ See the inputenc package documentation for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.6 Федеральн
-                      ое государственное автономно...
+l.6         Федеральн
+                              ое государственное автон...
 
 You may provide a definition with
 \DeclareUnicodeCharacter 
@@ -181,8 +181,8 @@ See the inputenc package documentation for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.6 Федерально
-                        е государственное автономно...
+l.6         Федерально
+                                е государственное автон...
 
 You may provide a definition with
 \DeclareUnicodeCharacter 
@@ -195,8 +195,8 @@ See the inputenc package documentation for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.6 Федеральное
-                           государственное автономно...
+l.6         Федеральное
+                                   государственное автон...
 
 You may provide a definition with
 \DeclareUnicodeCharacter 
@@ -209,8 +209,8 @@ See the inputenc package documentation for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.6 Федеральное г
-                             осударственное автономно...
+l.6         Федеральное г
+                                     осударственное автон...
 
 You may provide a definition with
 \DeclareUnicodeCharacter 
@@ -223,8 +223,8 @@ See the inputenc package documentation for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.6 Федеральное го
-                               сударственное автономно...
+l.6         Федеральное го
+                                       сударственное автон...
 
 You may provide a definition with
 \DeclareUnicodeCharacter 
@@ -237,8 +237,8 @@ See the inputenc package documentation for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.6 Федеральное гос
-                                 ударственное автономно...
+l.6         Федеральное гос
+                                         ударственное автон...
 
 You may provide a definition with
 \DeclareUnicodeCharacter 
@@ -251,8 +251,8 @@ See the inputenc package documentation for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.6 Федеральное госу
-                                   дарственное автономно...
+l.6         Федеральное госу
+                                           дарственное автон...
 
 You may provide a definition with
 \DeclareUnicodeCharacter 
@@ -265,8 +265,8 @@ See the inputenc package documentation for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.6 Федеральное госуд
-                                     арственное автономно...
+l.6         Федеральное госуд
+                                             арственное автон...
 
 You may provide a definition with
 \DeclareUnicodeCharacter 
@@ -279,8 +279,8 @@ See the inputenc package documentation for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.6 Федеральное госуда
-                                       рственное автономно...
+l.6         Федеральное госуда
+                                               рственное автон...
 
 You may provide a definition with
 \DeclareUnicodeCharacter 
@@ -293,8 +293,8 @@ See the inputenc package documentation for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.6 Федеральное государ
-                                         ственное автономно...
+l.6         Федеральное государ
+                                                 ственное автон...
 
 You may provide a definition with
 \DeclareUnicodeCharacter 
@@ -307,8 +307,8 @@ See the inputenc package documentation for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.6 Федеральное государс
-                                           твенное автономно...
+l.6 ...    Федеральное государс
+                                                  твенное автон�...
 
 You may provide a definition with
 \DeclareUnicodeCharacter 
@@ -321,8 +321,8 @@ See the inputenc package documentation for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.6 Федеральное государст
-                                             венное автономно...
+l.6 ...  Федеральное государст
+                                                  венное автоно�...
 
 You may provide a definition with
 \DeclareUnicodeCharacter 
@@ -335,8 +335,8 @@ See the inputenc package documentation for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.6 Федеральное государств
-                                               енное автономно...
+l.6 ...Федеральное государств
+                                                  енное автоном�...
 
 You may provide a definition with
 \DeclareUnicodeCharacter 
@@ -349,8 +349,8 @@ See the inputenc package documentation for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.6 Федеральное государстве
-                                                 нное автономно...
+l.6 ...едеральное государстве
+                                                  нное автономн�...
 
 You may provide a definition with
 \DeclareUnicodeCharacter 
@@ -1451,6 +1451,6 @@ Here is how much of TeX's memory you used:
  3823 multiletter control sequences out of 15000+600000
  3640 words of font info for 14 fonts, out of 8000000 for 9000
  452 hyphenation exceptions out of 8191
- 10i,1n,10p,324b,93s stack positions out of 5000i,500n,10000p,200000b,80000s
+ 10i,1n,10p,332b,93s stack positions out of 5000i,500n,10000p,200000b,80000s
 
 !  ==> Fatal error occurred, no output PDF file produced!
