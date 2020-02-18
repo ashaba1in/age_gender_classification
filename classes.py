@@ -284,8 +284,6 @@ class Dataset(torch.utils.data.Dataset):
     def __getitem__(self, index: int) -> np.array:
         filename = self.filenames[index]
         sample = cv2.resize(cv2.imread(filename), (IMAGE_SIZE, IMAGE_SIZE))
-
-        # image = self.transforms(sample)
         return sample
 
     def __iter__(self):
