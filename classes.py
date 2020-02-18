@@ -12,6 +12,10 @@ import torch.utils.data
 import torchvision
 import torchvision.transforms as transforms
 from PIL import Image
+import scipy.misc
+
+
+IMAGE_SIZE = 128
 
 
 class Model:
@@ -205,14 +209,14 @@ class FaceHandler:
 
 
 class ImageDataset(torch.utils.data.Dataset):
-    def __init__(self, dataframe: pd.DataFrame, mode: str) -> None:
+    def __init__(self, dataframe: pd.DataFrame, mode: str = None) -> None:
         super(ImageDataset, self).__init__()
         self.df = dataframe
         self.mode = mode
         image_size = 100
-        
+
         transforms_list = []
-        
+
         if self.mode == 'train':
             transforms_list.extend([
                 transforms.RandomChoice([
@@ -240,6 +244,52 @@ class ImageDataset(torch.utils.data.Dataset):
         if self.mode == 'debug':
             return image, self.df['target'].values[index], filename
         return image, self.df['target'].values[index]
-    
+
     def __len__(self) -> int:
         return self.df.shape[0]
+
+
+class Dataset(torch.utils.data.Dataset):
+    def __init__(self, filenames: np.array) -> None:
+        super(Dataset, self).__init__()
+        self.filenames = filenames
+        self.detected_filenames = []
+
+        transforms_list = [
+            transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
+            transforms.ToTensor()
+        ]
+
+        self.transforms = transforms.Compose(transforms_list)
+
+        self.detector = dlib.get_frontal_face_detector()  # our detector
+
+    def detect_faces(self) -> None:
+        for i in range(self.__len__()):
+            image = self.__getitem__(i)
+            dets = self.detector(image, 0)
+
+            for j, d in enumerate(dets):
+                top = max(d.top(), 0)
+                bot = min(d.bottom(), IMAGE_SIZE)
+                left = max(d.left(), 0)
+                right = min(d.right(), IMAGE_SIZE)
+                image = image[top:bot, left:right]
+
+                path = "detected/{}_{}.jpeg".format(i, j)
+                cv2.imwrite(path, image)
+
+                self.detected_filenames.append(path)
+
+    def __getitem__(self, index: int) -> np.array:
+        filename = self.filenames[index]
+        sample = cv2.resize(cv2.imread(filename), (IMAGE_SIZE, IMAGE_SIZE))
+
+        # image = self.transforms(sample)
+        return sample
+
+    def __iter__(self):
+        yield from self.filenames
+
+    def __len__(self) -> int:
+        return len(self.filenames)
