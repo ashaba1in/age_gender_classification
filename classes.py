@@ -294,7 +294,7 @@ class Dataset(torch.utils.data.Dataset):
         self.detected.gender = np.vectorize(self.classify_gender)(self.detected.face_path)
 
     def classify_faces_age(self) -> None:
-        self.detected.gender = np.vectorize(self.classify_age)(self.detected.face_path)
+        self.detected.age = np.vectorize(self.classify_age)(self.detected.face_path)
 
     def __getitem__(self, index: int) -> np.array:
         image_path = self.image_paths[index]
