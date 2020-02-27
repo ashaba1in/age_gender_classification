@@ -16,6 +16,8 @@ import scipy.misc
 
 
 IMAGE_SIZE = 128
+MALE = 1
+FEMALE = 0
 
 
 class Model:
@@ -250,23 +252,22 @@ class ImageDataset(torch.utils.data.Dataset):
 
 
 class Dataset(torch.utils.data.Dataset):
-    def __init__(self, filenames: np.array) -> None:
+    def __init__(self, image_paths: np.array) -> None:
         super(Dataset, self).__init__()
-        self.filenames = filenames
-        self.detected_filenames = []
-
-        transforms_list = [
-            transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
-            transforms.ToTensor()
-        ]
-
-        self.transforms = transforms.Compose(transforms_list)
+        self.image_paths = image_paths
+        self.detected = pd.DataFrame(columns=['face_path', 'parent_image_path', 'age', 'gender'])
 
         self.detector = dlib.get_frontal_face_detector()  # our detector
+        self.is_fake = lambda x: 0  # replace with proper validator
+        self.classify_gender = lambda x: MALE  # i want this to get path and return gender
+        self.classify_age = lambda x: 0  # i want this to get path and return age group
+
+    def read_image(self, path, img_size=IMAGE_SIZE):
+        return cv2.resize(cv2.imread(path), (img_size, img_size))
 
     def detect_faces(self) -> None:
-        for i in range(self.__len__()):
-            image = self.__getitem__(i)
+        for i, image_path in enumerate(self.image_paths):
+            image = self.read_image(image_path)
             dets = self.detector(image, 0)
 
             for j, d in enumerate(dets):
@@ -279,15 +280,29 @@ class Dataset(torch.utils.data.Dataset):
                 path = "detected/{}_{}.jpeg".format(i, j)
                 cv2.imwrite(path, image)
 
-                self.detected_filenames.append(path)
+                self.detected = self.detected.append({'image_path': image_path, 'face_path': path},
+                                                     ignore_index=True)
+
+    def remove_fake_faces(self) -> None:
+        for i, face_path in zip(self.detected.index, self.detected.face_path):
+            image = self.read_image(face_path)
+            if self.is_fake(image):
+                os.remove(face_path)
+                self.detected.drop(i, axis=0, inplace=True)
+
+    def classify_faces_gender(self) -> None:
+        self.detected.gender = np.vectorize(self.classify_gender)(self.detected.face_path)
+
+    def classify_faces_age(self) -> None:
+        self.detected.gender = np.vectorize(self.classify_age)(self.detected.face_path)
 
     def __getitem__(self, index: int) -> np.array:
-        filename = self.filenames[index]
-        sample = cv2.resize(cv2.imread(filename), (IMAGE_SIZE, IMAGE_SIZE))
+        image_path = self.image_paths[index]
+        sample = cv2.resize(cv2.imread(image_path), (IMAGE_SIZE, IMAGE_SIZE))
         return sample
 
     def __iter__(self):
-        yield from self.filenames
+        yield from self.image_paths
 
     def __len__(self) -> int:
-        return len(self.filenames)
+        return len(self.image_paths)
