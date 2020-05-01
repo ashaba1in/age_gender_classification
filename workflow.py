@@ -1,16 +1,11 @@
 import argparse
-from classes import Dataset
-import pandas as pd
-import os
-import numpy as np
-import magic
 import multiprocessing
-import dlib
+import os
 
-from typing import Tuple
-from torch.utils.data import DataLoader
-from torch.utils.data import dataset
+import magic
+import numpy as np
 
+from utils import Dataset
 
 BATCH_SIZE = 4096
 NUM_WORKERS = multiprocessing.cpu_count()
@@ -32,7 +27,7 @@ def load_data(path: str = 'faces/') -> Dataset:
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = argparse.ArgumentParser()
 
     parser.add_argument('--image_path', type=str)
 

@@ -7,7 +7,7 @@ import numpy as np
 from PIL import Image
 from tqdm import tqdm
 
-from classes import FaceHandler
+from utils import FaceHandler
 
 filterwarnings('ignore')
 
@@ -21,7 +21,7 @@ def get_filenames(path):
 
 
 def get_argv():
-    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = argparse.ArgumentParser()
     
     parser.add_argument('--image_path', type=str)
     parser.add_argument('--save_path', type=str)
