@@ -20,6 +20,7 @@ from utils import (
 	CenterLoss,
 	Model,
 	get_config,
+	print_log,
 )
 
 sns.set(style='darkgrid')
@@ -113,7 +114,7 @@ def main(model_name):
 			train(loader, model, optimizer, criterion)
 			epoch += 1
 		except RuntimeError:
-			print('Batch size {} too large, trying {}'.format(BATCH_SIZE, BATCH_SIZE // 2))
+			print_log('Batch size {} too large, trying {}'.format(BATCH_SIZE, BATCH_SIZE // 2))
 			BATCH_SIZE //= 2
 			loader = load_data(path=IMAGE_PATH, batch_size=BATCH_SIZE)
 			gc.collect()

@@ -14,6 +14,7 @@ from utils import (
 	get_config,
 	load_data,
 	Model,
+	print_log,
 )
 
 config = get_config()
@@ -70,14 +71,14 @@ def main(model_name):
 	
 	results = test(loader, model)
 	
-	print('total pictures {} with {:.5%} correct'.format(
+	print_log('total pictures {} with {:.5%} correct'.format(
 		len(loader.dataset),
 		np.sum(results)))
 	
 	for i in range(NUM_CLASSES):
-		print('CLASS {} correct {:.5%}'.format(i, results[i]))
+		print_log('CLASS {} correct {:.5%}'.format(i, results[i]))
 	
-	print('total time: {:.5f} seconds'.format(time.perf_counter() - global_start))
+	print_log('total time: {:.5f} seconds'.format(time.perf_counter() - global_start))
 	
 	dct = {
 		'model': model_name,

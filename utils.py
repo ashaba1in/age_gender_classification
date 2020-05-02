@@ -416,3 +416,8 @@ class FaceHandler:
 				)
 		
 		return total + len(rects)
+
+
+def print_log(msg: str, debug: bool = True):
+	if debug:
+		print(msg)
