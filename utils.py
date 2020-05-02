@@ -1,3 +1,5 @@
+import json
+import multiprocessing
 import os
 from typing import (
 	Any,
@@ -18,35 +20,33 @@ import torchvision.transforms as transforms
 from PIL import Image
 from torch.utils.data import DataLoader
 
-IMAGE_SIZE = 128
-MALE = 1
+
+def get_config():
+	with open('config.json', 'r') as _:
+		return json.load(_)
+
+
 FEMALE = 0
+MALE = 1
 
+config = get_config()
 
-def model_names():
-	return [
-		'ResNeXt-101-32x8d',
-		'WideResNet-101-2',
-		'WideResNet-50-2',
-		'ResNet-152',
-		'Densenet-161',
-		'ResNeXt-50-32x4d',
-		'ResNet-101',
-		'Densenet-201',
-		'ResNet-50',
-		'Densenet-169',
-		'Densenet-121',
-		'ResNet-34',
-		'ResNet-18'
-	]
+IMAGE_SIZE = config['image_size']
 
 
 class Model:
-	def __init__(self, model_name: str, device=None, num_classes: int = 2):
+	def __init__(
+			self,
+			model_name: str,
+			device=None,
+			num_classes: int = 2,
+			load_pretrained: bool = False,
+			path_pretrained: str = None
+	):
 		self.device = device
 		self.num_classes = num_classes
-		
-		self.possible_names = model_names()
+		self.path_pretrained = path_pretrained
+		self.possible_names = config['model_names']
 		
 		self._est = None
 		
@@ -55,7 +55,8 @@ class Model:
 				def __init__(self):
 					super(Identity, self).__init__()
 				
-				def forward(self, x):
+				@staticmethod
+				def forward(x):
 					return x
 			
 			if model_name == 'ResNet-18':
@@ -112,11 +113,14 @@ class Model:
 				self._est.fc = nn.Linear(self._est.classifier.in_features, self.num_classes)
 		else:
 			print('Model name should be from list {}'.format(self.possible_names))
+		
+		if load_pretrained:
+			self._load_est(os.path.join(path_pretrained, model_name))
 	
 	def model(self):
 		return self._est
 	
-	def load_est(self, path):
+	def _load_est(self, path):
 		model_name = path.split('/')[-1][:-4]
 		
 		if model_name in self.possible_names:
@@ -133,6 +137,192 @@ class Model:
 		else:
 			print('Path should lead to correct state dict file of model from list {}'.format(self.possible_names))
 			return self
+
+
+class ImageDataset(torch.utils.data.Dataset):
+	def __init__(self, dataframe: pd.DataFrame, mode: str = None) -> None:
+		super(ImageDataset, self).__init__()
+		self.df = dataframe
+		self.mode = mode
+		self.image_size = IMAGE_SIZE
+		
+		transforms_list = []
+		
+		if self.mode == 'train':
+			transforms_list.extend([
+				transforms.RandomChoice([
+					transforms.ColorJitter(0.5, 0.5, 0.5, 0.5),
+					transforms.RandomAffine(degrees=20, translate=(0.05, 0.05), scale=(0.7, 1.3), shear=10),
+					transforms.RandomHorizontalFlip(),
+					transforms.RandomGrayscale(0.05)
+				])
+			])
+		
+		transforms_list.extend([
+			transforms.Resize((self.image_size, self.image_size)),
+			transforms.ToTensor(),
+			transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+		])
+		
+		self.transforms = transforms.Compose(transforms_list)
+		self.targets = dataframe['target'].values
+	
+	def __getitem__(self, index: int) -> Any:
+		filename = self.df['filename'].values[index]
+		sample = Image.open(filename)
+		assert sample.mode == 'RGB'
+		image = self.transforms(sample)
+		if self.mode == 'debug':
+			return image, self.df['target'].values[index], filename
+		return image, self.df['target'].values[index]
+	
+	def __len__(self) -> int:
+		return self.df.shape[0]
+
+
+class Dataset(torch.utils.data.Dataset):
+	def __init__(self, image_paths: np.array) -> None:
+		super(Dataset, self).__init__()
+		self.image_paths = image_paths
+		self.detected = pd.DataFrame(columns=['face_path', 'parent_image_path', 'age', 'gender'])
+		self.detected_path = os.path.join(config['detected_save_path'], 'detected/{}_{}.jpeg')
+		
+		self.detector = lambda x: dlib.get_frontal_face_detector()(x, 0)  # our detector
+		self.is_fake = lambda x: 0  # replace with proper validator
+		self.classify_gender = lambda x: MALE  # i want this to get path and return gender
+		self.classify_age = lambda x: 0  # i want this to get path and return age group
+
+	def detect_faces(self) -> None:
+		for i, image_path in enumerate(self.image_paths):
+			image = self.read_image(image_path)
+			detected = self.detector(image)
+			
+			for j, d in enumerate(detected):
+				top = max(d.top(), 0)
+				bot = min(d.bottom(), IMAGE_SIZE)
+				left = max(d.left(), 0)
+				right = min(d.right(), IMAGE_SIZE)
+				image = image[top:bot, left:right]
+				
+				path = self.detected_path.format(i, j)
+				cv2.imwrite(path, image)
+				
+				self.detected = self.detected.append(
+					{
+						'image_path': image_path,
+						'face_path': path
+					},
+					ignore_index=True
+				)
+	
+	def remove_fake_faces(self) -> None:
+		drop = []
+		
+		for i, face_path in zip(self.detected.index, self.detected.face_path):
+			image = self.read_image(face_path)
+			if self.is_fake(image):
+				os.remove(face_path)
+				drop.append(i)
+		
+		self.detected.drop(drop, axis=0, inplace=True)
+	
+	def classify_faces_gender(self) -> None:
+		self.detected.gender = np.vectorize(self.classify_gender)(self.detected.face_path)
+	
+	def classify_faces_age(self) -> None:
+		self.detected.age = np.vectorize(self.classify_age)(self.detected.face_path)
+	
+	def __getitem__(self, index: int) -> np.array:
+		image_path = self.image_paths[index]
+		return cv2.resize(cv2.imread(image_path), (IMAGE_SIZE, IMAGE_SIZE))
+	
+	def __iter__(self):
+		yield from self.image_paths
+	
+	def __len__(self) -> int:
+		return len(self.image_paths)
+	
+	@staticmethod
+	def read_image(path, img_size=IMAGE_SIZE):
+		return cv2.resize(cv2.imread(path), (img_size, img_size))
+
+
+class CenterLoss(nn.Module):
+	def __init__(self, num_classes=2, feat_dim=2, use_gpu=True):
+		super(CenterLoss, self).__init__()
+		self.num_classes = num_classes
+		self.feat_dim = feat_dim
+		self.use_gpu = use_gpu
+		
+		if self.use_gpu:
+			self.centers = nn.Parameter(torch.randn(self.num_classes, self.feat_dim).cuda(), requires_grad=True)
+		else:
+			self.centers = nn.Parameter(torch.randn(self.num_classes, self.feat_dim), requires_grad=True)
+	
+	def forward(self, x, labels):
+		batch_size = x.size(0)
+		distmatrix = torch.pow(x, 2).sum(dim=1, keepdim=True).expand(batch_size, self.num_classes)
+		distmatrix += torch.pow(self.centers, 2).sum(dim=1, keepdim=True).expand(self.num_classes, batch_size).t()
+		
+		distmatrix.addmm_(x, self.centers.t(), beta=1, alpha=-2)
+		
+		classes = torch.arange(self.num_classes).long()
+		if self.use_gpu:
+			classes = classes.cuda()
+		
+		labels = labels.unsqueeze(1).expand(batch_size, self.num_classes)
+		mask = labels.eq(classes.expand(batch_size, self.num_classes))
+		
+		dist = distmatrix * mask.float()
+		loss = dist.clamp(min=1e-12, max=1e+12).sum() / batch_size
+		
+		return loss
+
+
+def get_filenames(path) -> np.ndarray:
+	filenames = []
+	for root, _, files in os.walk(path):
+		for _file in files:
+			filenames.append(os.path.join(root, _file))
+	return np.array(filenames)
+
+
+def get_data(path) -> Tuple[np.ndarray, np.ndarray]:
+	filenames = []
+	target = []
+	for root, _, files in os.walk(path):
+		for _file in files:
+			if magic.from_file(os.path.join(root, _file), mime=True).split('/')[0] == 'image':
+				filenames.append(os.path.join(root, _file))
+				target.append(int(filenames[-1].split('_')[1]))
+	return np.array(filenames), np.array(target)
+
+
+def load_data(
+		path: str,
+		batch_size: int = config['batch_size'],
+		num_workers: int = multiprocessing.cpu_count(),
+		use_gpu: bool = config['use_gpu'],
+		mode: str = 'train'
+) -> DataLoader:
+	x, y = get_data(path)
+	
+	df = pd.DataFrame(data={
+		'filename': x,
+		'target': y
+	})
+	
+	shuffle = mode == 'train'
+	
+	loader = DataLoader(
+		ImageDataset(df, mode=mode),
+		batch_size=batch_size,
+		shuffle=shuffle,
+		num_workers=num_workers,
+		pin_memory=use_gpu
+	)
+	
+	return loader
 
 
 class FaceHandler:
@@ -221,178 +411,8 @@ class FaceHandler:
 				y2 = 0
 			
 			if x2 - x1 > 0 and y2 - y1 > 0:
-				self.align(image, rect.rect).save(
+				self.align(image, rect).save(
 					os.path.join(self.save_path, '_'.join(['face', str(int(human)), str(total + i)])) + '.' + ext
 				)
 		
 		return total + len(rects)
-
-
-class ImageDataset(torch.utils.data.Dataset):
-	def __init__(self, dataframe: pd.DataFrame, mode: str = None) -> None:
-		super(ImageDataset, self).__init__()
-		self.df = dataframe
-		self.mode = mode
-		image_size = 100
-		
-		transforms_list = []
-		
-		if self.mode == 'train':
-			transforms_list.extend([
-				transforms.RandomChoice([
-					transforms.ColorJitter(0.5, 0.5, 0.5, 0.5),
-					transforms.RandomAffine(degrees=20, translate=(0.05, 0.05), scale=(0.7, 1.3), shear=10),
-					transforms.RandomHorizontalFlip(),
-					transforms.RandomGrayscale(0.05)
-				])
-			])
-		
-		transforms_list.extend([
-			transforms.Resize((image_size, image_size)),
-			transforms.ToTensor(),
-			transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-		])
-		
-		self.transforms = transforms.Compose(transforms_list)
-		self.targets = dataframe['target'].values
-	
-	def __getitem__(self, index: int) -> Any:
-		filename = self.df['filename'].values[index]
-		sample = Image.open(filename)
-		assert sample.mode == 'RGB'
-		image = self.transforms(sample)
-		if self.mode == 'debug':
-			return image, self.df['target'].values[index], filename
-		return image, self.df['target'].values[index]
-	
-	def __len__(self) -> int:
-		return self.df.shape[0]
-
-
-class Dataset(torch.utils.data.Dataset):
-	def __init__(self, image_paths: np.array) -> None:
-		super(Dataset, self).__init__()
-		self.image_paths = image_paths
-		self.detected = pd.DataFrame(columns=['face_path', 'parent_image_path', 'age', 'gender'])
-		
-		self.detector = dlib.get_frontal_face_detector()  # our detector
-		self.is_fake = lambda x: 0  # replace with proper validator
-		self.classify_gender = lambda x: MALE  # i want this to get path and return gender
-		self.classify_age = lambda x: 0  # i want this to get path and return age group
-	
-	@staticmethod
-	def read_image(path, img_size=IMAGE_SIZE):
-		return cv2.resize(cv2.imread(path), (img_size, img_size))
-	
-	def detect_faces(self) -> None:
-		for i, image_path in enumerate(self.image_paths):
-			image = self.read_image(image_path)
-			dets = self.detector(image, 0)
-			
-			for j, d in enumerate(dets):
-				top = max(d.top(), 0)
-				bot = min(d.bottom(), IMAGE_SIZE)
-				left = max(d.left(), 0)
-				right = min(d.right(), IMAGE_SIZE)
-				image = image[top:bot, left:right]
-				
-				path = "detected/{}_{}.jpeg".format(i, j)
-				cv2.imwrite(path, image)
-				
-				self.detected = self.detected.append({
-					'image_path': image_path,
-					'face_path': path
-				},
-					ignore_index=True)
-	
-	def remove_fake_faces(self) -> None:
-		for i, face_path in zip(self.detected.index, self.detected.face_path):
-			image = self.read_image(face_path)
-			if self.is_fake(image):
-				os.remove(face_path)
-				self.detected.drop(i, axis=0, inplace=True)
-	
-	def classify_faces_gender(self) -> None:
-		self.detected.gender = np.vectorize(self.classify_gender)(self.detected.face_path)
-	
-	def classify_faces_age(self) -> None:
-		self.detected.age = np.vectorize(self.classify_age)(self.detected.face_path)
-	
-	def __getitem__(self, index: int) -> np.array:
-		image_path = self.image_paths[index]
-		sample = cv2.resize(cv2.imread(image_path), (IMAGE_SIZE, IMAGE_SIZE))
-		return sample
-	
-	def __iter__(self):
-		yield from self.image_paths
-	
-	def __len__(self) -> int:
-		return len(self.image_paths)
-
-
-class CenterLoss(nn.Module):
-	def __init__(self, num_classes=10, feat_dim=2, use_gpu=True):
-		super(CenterLoss, self).__init__()
-		self.num_classes = num_classes
-		self.feat_dim = feat_dim
-		self.use_gpu = use_gpu
-		
-		if self.use_gpu:
-			self.centers = nn.Parameter(torch.randn(self.num_classes, self.feat_dim).cuda(), requires_grad=True)
-		else:
-			self.centers = nn.Parameter(torch.randn(self.num_classes, self.feat_dim), requires_grad=True)
-	
-	def forward(self, x, labels):
-		batch_size = x.size(0)
-		distmatrix = torch.pow(x, 2).sum(dim=1, keepdim=True).expand(batch_size, self.num_classes)
-		distmatrix += torch.pow(self.centers, 2).sum(dim=1, keepdim=True).expand(self.num_classes, batch_size).t()
-		
-		distmatrix.addmm_(x, self.centers.t(), beta=1, alpha=-2)
-		
-		classes = torch.arange(self.num_classes).long()
-		if self.use_gpu:
-			classes = classes.cuda()
-		
-		labels = labels.unsqueeze(1).expand(batch_size, self.num_classes)
-		mask = labels.eq(classes.expand(batch_size, self.num_classes))
-		
-		dist = distmatrix * mask.float()
-		loss = dist.clamp(min=1e-12, max=1e+12).sum() / batch_size
-		
-		return loss
-
-
-def get_data(path) -> Tuple[np.ndarray, np.ndarray]:
-	filenames = []
-	target = []
-	for root, _, files in os.walk(path):
-		for _file in files:
-			if magic.from_file(os.path.join(root, _file), mime=True).split('/')[0] == 'image':
-				filenames.append(os.path.join(root, _file))
-				target.append(int(filenames[-1].split('_')[1]))
-	return np.array(filenames), np.array(target)
-
-
-def load_data(
-		BATCH_SIZE: int,
-		NUM_WORKERS: int,
-		USE_GPU: bool,
-		path: str = 'faces/',
-		mode='train'
-) -> DataLoader:
-	x, y = get_data(path)
-	
-	df = pd.DataFrame(data={
-		'filename': x,
-		'target': y
-	})
-	
-	loader = DataLoader(
-		ImageDataset(df, mode=mode),
-		batch_size=BATCH_SIZE,
-		shuffle=True,
-		num_workers=NUM_WORKERS,
-		pin_memory=USE_GPU
-	)
-	
-	return loader
