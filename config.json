@@ -1,0 +1,30 @@
+{
+  "model_names": [
+    "ResNeXt-101-32x8d",
+    "WideResNet-101-2",
+    "WideResNet-50-2",
+    "ResNet-152",
+    "Densenet-161",
+    "ResNeXt-50-32x4d",
+    "ResNet-101",
+    "ResNet-50",
+    "Densenet-201",
+    "Densenet-169",
+    "Densenet-121",
+    "ResNet-34",
+    "ResNet-18"
+  ],
+  "image_size": 128,
+  "num_classes": 2,
+  "use_gpu": true,
+  "batch_size": 4096,
+  "learning_rate": 1e-4,
+  "lr_step": 16,
+  "lr_factor": 1e-1,
+  "num_epochs": 64,
+  "image_train_path": "../data/train/",
+  "image_test_path": "../data/test/",
+  "image_save_path": "../data/cropped/",
+  "detected_save_path": "../data/detected/",
+  "models_path": "../data/models/"
+}
