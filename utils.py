@@ -4,6 +4,7 @@ import os
 from typing import (
 	Any,
 	Tuple,
+	Union,
 )
 
 import cv2.cv2 as cv2
@@ -26,26 +27,21 @@ def get_config():
 		return json.load(_)
 
 
-FEMALE = 0
-MALE = 1
-
 config = get_config()
 
 IMAGE_SIZE = config['image_size']
 
 
-class Model:
+class AgeGender:
 	def __init__(
 			self,
 			model_name: str,
 			device=None,
-			num_classes: int = config['num_classes'],
 			load_pretrained: bool = False,
 			path_pretrained: str = None
 	):
 		self.device = device
 		self.zoo_pretrained = config['pretrained']
-		self.num_classes = num_classes
 		self.path_pretrained = path_pretrained
 		self.possible_names = config['model_names']
 		
@@ -60,60 +56,69 @@ class Model:
 				def forward(x):
 					return x
 			
+			class DoubleOutput(nn.Module):
+				def __init__(self, in_features: int):
+					super(DoubleOutput, self).__init__()
+					self.fc1 = nn.Linear(in_features, config['num_classes_age'])
+					self.fc2 = nn.Linear(in_features, config['num_classes_gender'])
+				
+				def forward(self, x):
+					return self.fc1(x), self.fc2(x)
+			
 			if model_name == 'ResNet-18':
 				self._est = torchvision.models.resnet18(pretrained=self.zoo_pretrained)
 				self._est.pool0 = Identity()
-				self._est.fc = nn.Linear(self._est.fc.in_features, self.num_classes)
+				self._est.fc = DoubleOutput(self._est.fc.in_features)
 			elif model_name == 'ResNet-34':
 				self._est = torchvision.models.resnet34(pretrained=self.zoo_pretrained)
 				self._est.pool0 = Identity()
-				self._est.fc = nn.Linear(self._est.fc.in_features, self.num_classes)
+				self._est.fc = DoubleOutput(self._est.fc.in_features)
 			elif model_name == 'ResNet-50':
 				self._est = torchvision.models.resnet50(pretrained=self.zoo_pretrained)
 				self._est.pool0 = Identity()
-				self._est.fc = nn.Linear(self._est.fc.in_features, self.num_classes)
+				self._est.fc = DoubleOutput(self._est.fc.in_features)
 			elif model_name == 'ResNet-101':
 				self._est = torchvision.models.resnet101(pretrained=self.zoo_pretrained)
 				self._est.pool0 = Identity()
-				self._est.fc = nn.Linear(self._est.fc.in_features, self.num_classes)
+				self._est.fc = DoubleOutput(self._est.fc.in_features)
 			elif model_name == 'ResNet-152':
 				self._est = torchvision.models.resnet152(pretrained=self.zoo_pretrained)
 				self._est.pool0 = Identity()
-				self._est.fc = nn.Linear(self._est.fc.in_features, self.num_classes)
+				self._est.fc = DoubleOutput(self._est.fc.in_features)
 			elif model_name == 'ResNeXt-50-32x4d':
 				self._est = torchvision.models.resnext50_32x4d(pretrained=self.zoo_pretrained)
 				self._est.pool0 = Identity()
-				self._est.fc = nn.Linear(self._est.fc.in_features, self.num_classes)
+				self._est.fc = DoubleOutput(self._est.fc.in_features)
 			elif model_name == 'ResNeXt-101-32x8d':
 				self._est = torchvision.models.resnext101_32x8d(pretrained=self.zoo_pretrained)
 				self._est.pool0 = Identity()
-				self._est.fc = nn.Linear(self._est.fc.in_features, self.num_classes)
+				self._est.fc = DoubleOutput(self._est.fc.in_features)
 			elif model_name == 'WideResNet-50-2':
 				self._est = torchvision.models.wide_resnet50_2(pretrained=self.zoo_pretrained)
 				self._est.pool0 = Identity()
-				self._est.fc = nn.Linear(self._est.fc.in_features, self.num_classes)
+				self._est.fc = DoubleOutput(self._est.fc.in_features)
 			elif model_name == 'WideResNet-101-2':
 				self._est = torchvision.models.wide_resnet101_2(pretrained=self.zoo_pretrained)
 				self._est.pool0 = Identity()
-				self._est.fc = nn.Linear(self._est.fc.in_features, self.num_classes)
+				self._est.fc = DoubleOutput(self._est.fc.in_features)
 			elif model_name == 'Densenet-121':
 				self._est = torchvision.models.densenet121(pretrained=self.zoo_pretrained)
 				self._est.features.pool0 = Identity()
-				self._est.fc = nn.Linear(self._est.classifier.in_features, self.num_classes)
+				self._est.fc = DoubleOutput(self._est.fc.in_features)
 			elif model_name == 'Densenet-169':
 				self._est = torchvision.models.densenet169(pretrained=self.zoo_pretrained)
 				self._est.features.pool0 = Identity()
-				self._est.fc = nn.Linear(self._est.classifier.in_features, self.num_classes)
+				self._est.fc = DoubleOutput(self._est.fc.in_features)
 			elif model_name == 'Densenet-201':
 				self._est = torchvision.models.densenet201(pretrained=self.zoo_pretrained)
 				self._est.features.pool0 = Identity()
-				self._est.fc = nn.Linear(self._est.classifier.in_features, self.num_classes)
+				self._est.fc = DoubleOutput(self._est.fc.in_features)
 			elif model_name == 'Densenet-161':
 				self._est = torchvision.models.densenet161(pretrained=self.zoo_pretrained)
 				self._est.features.pool0 = Identity()
-				self._est.fc = nn.Linear(self._est.classifier.in_features, self.num_classes)
+				self._est.fc = DoubleOutput(self._est.fc.in_features)
 		else:
-			print('Model name should be from list {}'.format(self.possible_names))
+			print('AgeGender name should be from list {}'.format(self.possible_names))
 		
 		if load_pretrained:
 			self._load_est(os.path.join(path_pretrained, model_name))
@@ -166,7 +171,8 @@ class ImageDataset(torch.utils.data.Dataset):
 		])
 		
 		self.transforms = transforms.Compose(transforms_list)
-		self.targets = dataframe['target'].values
+		self.targets_age = dataframe['target_age'].values
+		self.targets_gender = dataframe['target_gender'].values
 	
 	def __getitem__(self, index: int) -> Any:
 		filename = self.df['filename'].values[index]
@@ -174,47 +180,42 @@ class ImageDataset(torch.utils.data.Dataset):
 		assert sample.mode == 'RGB'
 		image = self.transforms(sample)
 		if self.mode == 'debug':
-			return image, self.df['target'].values[index], filename
-		return image, self.df['target'].values[index]
+			return image, self.targets_age[index], self.targets_gender[index], filename
+		return image, self.targets_age[index], self.targets_gender[index]
 	
 	def __len__(self) -> int:
 		return self.df.shape[0]
 
 
 class Dataset(torch.utils.data.Dataset):
-	def __init__(self, image_paths: np.array) -> None:
+	def __init__(self, image_path: str) -> None:
 		super(Dataset, self).__init__()
-		self.image_paths = image_paths
+		self.image_path = image_path
+		self.image_paths = None
 		self.detected = pd.DataFrame(columns=['face_path', 'parent_image_path', 'age', 'gender'])
 		self.detected_path = os.path.join(config['detected_save_path'], 'detected/{}_{}.jpeg')
 		
-		self.detector = lambda x: dlib.get_frontal_face_detector()(x, 0)  # our detector
-		self.is_fake = lambda x: 0  # replace with proper validator
-		self.classify_gender = lambda x: MALE  # i want this to get path and return gender
-		self.classify_age = lambda x: 0  # i want this to get path and return age group
-
+		self.detector = lambda x: torch.Tensor  # replace with proper face detector
+		self.is_fake = lambda x: torch.Tensor  # replace with proper validator
+		self.age_gender_model = lambda x: torch.Tensor  # torch based model for predicting age and gender
+	
+	def collect_images(self) -> None:
+		self.image_paths = get_data(self.image_path, collect_targets=False)
+	
 	def detect_faces(self) -> None:
 		for i, image_path in enumerate(self.image_paths):
 			image = self.read_image(image_path)
-			detected = self.detector(image)
 			
-			for j, d in enumerate(detected):
-				top = max(d.top(), 0)
-				bot = min(d.bottom(), IMAGE_SIZE)
-				left = max(d.left(), 0)
-				right = min(d.right(), IMAGE_SIZE)
-				image = image[top:bot, left:right]
-				
-				path = self.detected_path.format(i, j)
-				cv2.imwrite(path, image)
-				
-				self.detected = self.detected.append(
-					{
-						'image_path': image_path,
-						'face_path': path
-					},
-					ignore_index=True
-				)
+			path = self.detected_path.format(i)
+			cv2.imwrite(path, image)
+			
+			self.detected = self.detected.append(
+				{
+					'image_path': image_path,
+					'face_path': path
+				},
+				ignore_index=True
+			)
 	
 	def remove_fake_faces(self) -> None:
 		drop = []
@@ -227,21 +228,17 @@ class Dataset(torch.utils.data.Dataset):
 		
 		self.detected.drop(drop, axis=0, inplace=True)
 	
-	def classify_faces_gender(self) -> None:
-		self.detected.gender = np.vectorize(self.classify_gender)(self.detected.face_path)
-	
-	def classify_faces_age(self) -> None:
-		self.detected.age = np.vectorize(self.classify_age)(self.detected.face_path)
-	
-	def __getitem__(self, index: int) -> np.array:
-		image_path = self.image_paths[index]
-		return cv2.resize(cv2.imread(image_path), (IMAGE_SIZE, IMAGE_SIZE))
-	
-	def __iter__(self):
-		yield from self.image_paths
-	
-	def __len__(self) -> int:
-		return len(self.image_paths)
+	def classify_faces_age_gender(self) -> None:
+		age = torch.LongTensor()
+		gender = torch.LongTensor()
+		loader = load_data(self.detected.face_path, mode='inference')
+		for images in loader:
+			output = self.age_gender_model(images)
+			output = output.data.max(1, keepdim=True)[1]
+			age = torch.cat((age, output[:, 0]), dim=0)
+			gender = torch.cat((gender, output[:, 1]), dim=0)
+		self.detected.age = age.numpy()
+		self.detected.gender = gender.numpy()
 	
 	@staticmethod
 	def read_image(path, img_size=IMAGE_SIZE):
@@ -280,23 +277,18 @@ class CenterLoss(nn.Module):
 		return loss
 
 
-def get_filenames(path) -> np.ndarray:
-	filenames = []
-	for root, _, files in os.walk(path):
-		for _file in files:
-			filenames.append(os.path.join(root, _file))
-	return np.array(filenames)
-
-
-def get_data(path) -> Tuple[np.ndarray, np.ndarray]:
+def get_data(path, collect_targets=True) -> Union[Tuple[np.ndarray, np.ndarray], np.ndarray]:
 	filenames = []
 	target = []
 	for root, _, files in os.walk(path):
 		for _file in files:
 			if magic.from_file(os.path.join(root, _file), mime=True).split('/')[0] == 'image':
 				filenames.append(os.path.join(root, _file))
-				target.append(int(filenames[-1].split('_')[1]))
-	return np.array(filenames), np.array(target)
+				if collect_targets:
+					target.append(int(filenames[-1].split('_')[1]))
+	if collect_targets:
+		return np.array(filenames), np.array(target)
+	return np.array(filenames)
 
 
 def load_data(

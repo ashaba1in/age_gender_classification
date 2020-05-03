@@ -8,19 +8,19 @@ import numpy as np
 import pandas as pd
 import torch.backends.cudnn as cudnn
 import torch.multiprocessing
-from tqdm import tqdm
 
 from utils import (
+	AgeGender,
 	get_config,
 	load_data,
-	Model,
 	print_log,
 )
 
 config = get_config()
 
 IMAGE_PATH = config['image_test_path']
-NUM_CLASSES = config['num_classes']
+NUM_CLASSES_AGE = config['num_classes_age']
+NUM_CLASSES_GENDER = config['num_classes_gender']
 NUM_WORKERS = multiprocessing.cpu_count()
 
 USE_GPU = config['use_gpu']
@@ -34,32 +34,50 @@ MODELS_PATH = config['models_path']
 
 
 def test(data_loader, model):
-	correct = np.zeros(NUM_CLASSES)
+	model.eval()
+	correct_age = np.zeros(NUM_CLASSES_AGE, dtype=int)
+	correct_gender = np.zeros(NUM_CLASSES_GENDER, dtype=int)
 	
-	for images, labels in tqdm(data_loader, disable=True):
-		images, labels = images.to(DEVICE), labels.to(DEVICE)
-		
-		pred = model(images).data.max(1, keepdim=True)[1]
-		for i in range(NUM_CLASSES):
-			mask = labels == i
-			correct[i] += pred[mask].eq(labels[mask].data.view_as(pred[mask])).cpu().sum()
+	with torch.no_grad():
+		for images, labels_age, labels_gender in data_loader:
+			images, labels_age, labels_gender = images.to(DEVICE), labels_age.to(DEVICE), labels_gender.to(DEVICE)
+			
+			output_age, output_gender = model(images)
+			
+			pred_age = output_age.data.max(1, keepdim=True)[1]
+			for i in range(NUM_CLASSES_AGE):
+				mask = labels_age == i
+				correct_age[i] += pred_age[mask].eq(
+					labels_age[mask].data.view_as(pred_age[mask])).cpu().sum()
+			
+			pred_gender = output_age.data.max(1, keepdim=True)[1]
+			for i in range(NUM_CLASSES_GENDER):
+				mask = labels_gender == i
+				correct_gender[i] += pred_gender[mask].eq(
+					labels_gender[mask].data.view_as(pred_gender[mask])).cpu().sum()
 	
-	counts = np.zeros(NUM_CLASSES)
+	counts_age = np.zeros(NUM_CLASSES_AGE)
+	for i in range(NUM_CLASSES_AGE):
+		counts_age[i] += np.sum(data_loader.dataset.targets_age == i)
 	
-	for i in range(NUM_CLASSES):
-		counts[i] += np.sum(data_loader.dataset.targets == i)
+	counts_gender = np.zeros(NUM_CLASSES_GENDER)
+	for i in range(NUM_CLASSES_AGE):
+		counts_gender[i] += np.sum(data_loader.dataset.targets_gender == i)
 	
-	return correct / counts
+	classes = np.array(*(correct_age / counts_age), *(correct_gender / correct_gender))
+	accuracy_age = np.sum(correct_age) / np.sum(counts_age)
+	accuracy_gender = np.sum(correct_gender) / np.sum(counts_gender)
+	
+	return classes, accuracy_age, accuracy_gender
 
 
 def main(model_name):
 	with open(os.path.join(MODELS_PATH, 'BATCH_{}.txt'.format(model_name)), 'r') as _:
 		BATCH_SIZE = int(_.read())
 	
-	model = Model(
+	model = AgeGender(
 		model_name=model_name,
 		device=DEVICE,
-		num_classes=NUM_CLASSES,
 		load_pretrained=True,
 		path_pretrained=MODELS_PATH
 	).model()
@@ -69,24 +87,22 @@ def main(model_name):
 	loader = load_data(path=IMAGE_PATH, batch_size=BATCH_SIZE)
 	gc.collect()
 	
-	results = test(loader, model)
+	classes, accuracy_age, accuracy_gender = np.array(test(loader, model))
 	
-	print_log('total pictures {} with {:.5%} correct'.format(
-		len(loader.dataset),
-		np.sum(results)))
+	for i in range(NUM_CLASSES_AGE):
+		print_log('AGE CLASS {} correct {:.5%}'.format(i, classes[i]))
 	
-	for i in range(NUM_CLASSES):
-		print_log('CLASS {} correct {:.5%}'.format(i, results[i]))
+	for i in range(NUM_CLASSES_GENDER):
+		print_log('GENDER CLASS {} correct {:.5%}'.format(i, classes[i + NUM_CLASSES_AGE]))
 	
 	print_log('total time: {:.5f} seconds'.format(time.perf_counter() - global_start))
 	
 	dct = {
 		'model': model_name,
-		'total_time': time.perf_counter() - global_start
+		'total_time': time.perf_counter() - global_start,
+		'accuracy_AGE': accuracy_age,
+		'accuracy_GENDER': accuracy_gender
 	}
-	
-	for i in range(NUM_CLASSES):
-		dct['CLASS_{}'.format(i)] = results[i]
 	
 	pd.DataFrame(dct).to_csv('results.csv', mode='a', header=False)
 

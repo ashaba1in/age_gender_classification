@@ -18,7 +18,7 @@ import torch.nn.functional as f
 from utils import (
 	load_data,
 	CenterLoss,
-	Model,
+	AgeGender,
 	get_config,
 	print_log,
 )
@@ -28,14 +28,16 @@ sns.set(style='darkgrid')
 config = get_config()
 
 IMAGE_PATH = config['image_train_path']
+MODELS_PATH = config['models_path']
 
 LEARNING_RATE = config['learning_rate']
-LR_STEP = config['lr_step']
-LR_FACTOR = config['lr_factor']
-BATCH_SIZE = config['batch_size']
-NUM_CLASSES = config['num_classes']
-NUM_EPOCHS = config['num_epochs']
+LEARNING_RATE_LOSS = config['learning_rate_loss']
 
+NUM_CLASSES_AGE = config['num_classes_age']
+NUM_CLASSES_GENDER = config['num_classes_gender']
+
+BATCH_SIZE = config['batch_size']
+NUM_EPOCHS = config['num_epochs']
 USE_GPU = config['use_gpu']
 
 DEVICE = torch.device("cuda:0" if USE_GPU and torch.cuda.is_available() else "cpu")
@@ -43,64 +45,79 @@ torch.multiprocessing.set_sharing_strategy('file_system')
 torch.backends.cudnn.benchmark = True
 cudnn.benchmark = True
 
-MODELS_PATH = config['models_path']
 
-
-def train(data_loader, model, optimizer, criterion):
+def train(data_loader, model, optimizers, criterions):
+	optimizer, optimizer_age, optimizer_gender = optimizers
+	criterion_age, criterion_gender = criterions
+	
 	model.train()
-	for images, labels in data_loader:
-		images, labels = images.to(DEVICE), labels.to(DEVICE)
+	
+	for images, labels_age, labels_gender in data_loader:
+		images, labels_age, labels_gender = images.to(DEVICE), labels_age.to(DEVICE), labels_gender.to(DEVICE)
 		
-		optimizer.zero_grad()
+		optimizer.zero_grad(), optimizer_age.zero_grad(), optimizer_gender.zero_grad()
 		
-		outputs = model(images)
+		outputs_age, outputs_gender = model(images)
 		
-		loss = criterion(outputs, labels)
+		loss_age_criterion = criterion_age(outputs_age, labels_age)
+		loss_gender_criterion = criterion_gender(outputs_gender, labels_gender)
+		loss_model = loss_age_criterion + loss_gender_criterion
 		
-		loss.backward()
+		loss_age_criterion.backward(), loss_gender_criterion.backward(), loss_model.backward()
 		
-		optimizer.step()
+		optimizer.step(), optimizer_age.step(), optimizer_gender.step()
 
 
 def evaluate(data_loader, model):
 	model.eval()
-	loss = 0.0
-	correct = np.zeros(NUM_CLASSES, dtype=int)
+	losses = np.zeros(2, dtype=np.float32)
+	correct_age = np.zeros(NUM_CLASSES_AGE, dtype=int)
+	correct_gender = np.zeros(NUM_CLASSES_GENDER, dtype=int)
 	
 	with torch.no_grad():
-		for images, labels in data_loader:
-			images, labels = images.to(DEVICE), labels.to(DEVICE)
+		for images, labels_age, labels_gender in data_loader:
+			images, labels_age, labels_gender = images.to(DEVICE), labels_age.to(DEVICE), labels_gender.to(DEVICE)
 			
-			outputs = model(images)
+			output_age, output_gender = model(images)
 			
-			loss += f.cross_entropy(outputs, labels, reduction='sum').item()
+			losses[0] += f.cross_entropy(output_age, labels_age, reduction='sum').item()
+			losses[1] += f.cross_entropy(output_gender, labels_gender, reduction='sum').item()
 			
-			pred = outputs.data.max(1, keepdim=True)[1]
+			pred_age = output_age.data.max(1, keepdim=True)[1]
+			for i in range(NUM_CLASSES_AGE):
+				mask = labels_age == i
+				correct_age[i] += pred_age[mask].eq(
+					labels_age[mask].data.view_as(pred_age[mask])).cpu().sum()
 			
-			for i in range(NUM_CLASSES):
-				mask = labels == i
-				correct[i] += pred[mask].eq(labels[mask].data.view_as(pred[mask])).cpu().sum()
+			pred_gender = output_age.data.max(1, keepdim=True)[1]
+			for i in range(NUM_CLASSES_GENDER):
+				mask = labels_gender == i
+				correct_gender[i] += pred_gender[mask].eq(
+					labels_gender[mask].data.view_as(pred_gender[mask])).cpu().sum()
 	
-	loss /= len(data_loader.dataset)
+	losses /= len(data_loader.dataset)
 	
-	counts = np.zeros(NUM_CLASSES)
+	counts_age = np.zeros(NUM_CLASSES_AGE)
+	for i in range(NUM_CLASSES_AGE):
+		counts_age[i] += np.sum(data_loader.dataset.targets_age == i)
 	
-	for i in range(NUM_CLASSES):
-		counts[i] += np.sum(data_loader.dataset.targets == i)
+	counts_gender = np.zeros(NUM_CLASSES_GENDER)
+	for i in range(NUM_CLASSES_AGE):
+		counts_gender[i] += np.sum(data_loader.dataset.targets_gender == i)
 	
-	return loss, *(correct / counts)
+	return *losses, *(correct_age / counts_age), *(correct_gender / correct_gender)
 
 
 def main(model_name):
-	model = Model(model_name=model_name, device=DEVICE, num_classes=NUM_CLASSES).model()
+	model = AgeGender(model_name=model_name, device=DEVICE).model()
 	global BATCH_SIZE
 	
-	criterion = CenterLoss(num_classes=NUM_CLASSES, feat_dim=2, use_gpu=USE_GPU)
+	criterion_age = CenterLoss(num_classes=NUM_CLASSES_AGE, feat_dim=2, use_gpu=USE_GPU)
+	criterion_gender = CenterLoss(num_classes=NUM_CLASSES_GENDER, feat_dim=2, use_gpu=USE_GPU)
 	
-	parameters = list(model.parameters()) + list(criterion.parameters())
-	
-	optimizer = torch.optim.Adam(parameters, lr=LEARNING_RATE)
-	lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=LR_STEP, gamma=LR_FACTOR)
+	optimizer_age = torch.optim.Adam(criterion_age.parameters(), lr=LEARNING_RATE_LOSS)
+	optimizer_gender = torch.optim.Adam(criterion_gender.parameters(), lr=LEARNING_RATE_LOSS)
+	optimizer_model = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 	
 	history = []
 	epoch = 0
@@ -111,7 +128,7 @@ def main(model_name):
 	
 	while epoch < NUM_EPOCHS:
 		try:
-			train(loader, model, optimizer, criterion)
+			train(loader, model, [optimizer_model, optimizer_age, optimizer_gender], [criterion_age, criterion_gender])
 			epoch += 1
 		except RuntimeError:
 			print_log('Batch size {} too large, trying {}'.format(BATCH_SIZE, BATCH_SIZE // 2))
@@ -122,23 +139,31 @@ def main(model_name):
 		
 		history.append(evaluate(loader, model))
 		
-		lr_scheduler.step(epoch)
 		torch.save(model.state_dict(), os.path.join(MODELS_PATH, '{}.pth'.format(model_name)))
 		bar.update(1)
 	
 	history = np.array(history)
 	
-	plt.figure(figsize=(15, 15))
+	plt.figure(figsize=(20, 20))
 	plt.title('loss model {}'.format(model_name))
-	plt.plot(history[:, 0], marker='.')
+	plt.plot(history[:, 0], marker='.', label='age')
+	plt.plot(history[:, 1], marker='.', label='gender')
+	plt.legend()
 	plt.savefig(os.path.join(MODELS_PATH, 'loss_{}.png'.format(model_name)))
 	
-	plt.figure(figsize=(15, 15))
-	plt.title('accuracy on fake and real')
-	plt.plot(history[:, 2], marker='.', label='real')
-	plt.plot(history[:, 1], marker='.', label='fake')
+	plt.figure(figsize=(20, 20))
+	plt.title('accuracy age model {}'.format(model_name))
+	for i in range(NUM_CLASSES_AGE):
+		plt.plot(history[:, i + 2], marker='.', label='class {}'.format(i))
 	plt.legend()
-	plt.savefig(os.path.join(MODELS_PATH, 'accuracy_{}.png'.format(model_name)))
+	plt.savefig(os.path.join(MODELS_PATH, 'accuracy_age_{}.png'.format(model_name)))
+	
+	plt.figure(figsize=(20, 20))
+	plt.title('accuracy gender model {}'.format(model_name))
+	for i in range(NUM_CLASSES_GENDER):
+		plt.plot(history[:, i + 2 + NUM_CLASSES_AGE], marker='.', label='class {}'.format(i))
+	plt.legend()
+	plt.savefig(os.path.join(MODELS_PATH, 'accuracy_gender_{}.png'.format(model_name)))
 	
 	with open(os.path.join(MODELS_PATH, 'BATCH_{}.txt'.format(model_name)), 'w') as _:
 		_.write(str(BATCH_SIZE))
