@@ -39,11 +39,12 @@ class Model:
 			self,
 			model_name: str,
 			device=None,
-			num_classes: int = 2,
+			num_classes: int = config['num_classes'],
 			load_pretrained: bool = False,
 			path_pretrained: str = None
 	):
 		self.device = device
+		self.zoo_pretrained = config['pretrained']
 		self.num_classes = num_classes
 		self.path_pretrained = path_pretrained
 		self.possible_names = config['model_names']
@@ -60,55 +61,55 @@ class Model:
 					return x
 			
 			if model_name == 'ResNet-18':
-				self._est = torchvision.models.resnet18(pretrained=False)
+				self._est = torchvision.models.resnet18(pretrained=self.zoo_pretrained)
 				self._est.pool0 = Identity()
 				self._est.fc = nn.Linear(self._est.fc.in_features, self.num_classes)
 			elif model_name == 'ResNet-34':
-				self._est = torchvision.models.resnet34(pretrained=False)
+				self._est = torchvision.models.resnet34(pretrained=self.zoo_pretrained)
 				self._est.pool0 = Identity()
 				self._est.fc = nn.Linear(self._est.fc.in_features, self.num_classes)
 			elif model_name == 'ResNet-50':
-				self._est = torchvision.models.resnet50(pretrained=False)
+				self._est = torchvision.models.resnet50(pretrained=self.zoo_pretrained)
 				self._est.pool0 = Identity()
 				self._est.fc = nn.Linear(self._est.fc.in_features, self.num_classes)
 			elif model_name == 'ResNet-101':
-				self._est = torchvision.models.resnet101(pretrained=False)
+				self._est = torchvision.models.resnet101(pretrained=self.zoo_pretrained)
 				self._est.pool0 = Identity()
 				self._est.fc = nn.Linear(self._est.fc.in_features, self.num_classes)
 			elif model_name == 'ResNet-152':
-				self._est = torchvision.models.resnet152(pretrained=False)
+				self._est = torchvision.models.resnet152(pretrained=self.zoo_pretrained)
 				self._est.pool0 = Identity()
 				self._est.fc = nn.Linear(self._est.fc.in_features, self.num_classes)
 			elif model_name == 'ResNeXt-50-32x4d':
-				self._est = torchvision.models.resnext50_32x4d(pretrained=False)
+				self._est = torchvision.models.resnext50_32x4d(pretrained=self.zoo_pretrained)
 				self._est.pool0 = Identity()
 				self._est.fc = nn.Linear(self._est.fc.in_features, self.num_classes)
 			elif model_name == 'ResNeXt-101-32x8d':
-				self._est = torchvision.models.resnext101_32x8d(pretrained=False)
+				self._est = torchvision.models.resnext101_32x8d(pretrained=self.zoo_pretrained)
 				self._est.pool0 = Identity()
 				self._est.fc = nn.Linear(self._est.fc.in_features, self.num_classes)
 			elif model_name == 'WideResNet-50-2':
-				self._est = torchvision.models.wide_resnet50_2(pretrained=False)
+				self._est = torchvision.models.wide_resnet50_2(pretrained=self.zoo_pretrained)
 				self._est.pool0 = Identity()
 				self._est.fc = nn.Linear(self._est.fc.in_features, self.num_classes)
 			elif model_name == 'WideResNet-101-2':
-				self._est = torchvision.models.wide_resnet101_2(pretrained=False)
+				self._est = torchvision.models.wide_resnet101_2(pretrained=self.zoo_pretrained)
 				self._est.pool0 = Identity()
 				self._est.fc = nn.Linear(self._est.fc.in_features, self.num_classes)
 			elif model_name == 'Densenet-121':
-				self._est = torchvision.models.densenet121(pretrained=False)
+				self._est = torchvision.models.densenet121(pretrained=self.zoo_pretrained)
 				self._est.features.pool0 = Identity()
 				self._est.fc = nn.Linear(self._est.classifier.in_features, self.num_classes)
 			elif model_name == 'Densenet-169':
-				self._est = torchvision.models.densenet169(pretrained=False)
+				self._est = torchvision.models.densenet169(pretrained=self.zoo_pretrained)
 				self._est.features.pool0 = Identity()
 				self._est.fc = nn.Linear(self._est.classifier.in_features, self.num_classes)
 			elif model_name == 'Densenet-201':
-				self._est = torchvision.models.densenet201(pretrained=False)
+				self._est = torchvision.models.densenet201(pretrained=self.zoo_pretrained)
 				self._est.features.pool0 = Identity()
 				self._est.fc = nn.Linear(self._est.classifier.in_features, self.num_classes)
 			elif model_name == 'Densenet-161':
-				self._est = torchvision.models.densenet161(pretrained=False)
+				self._est = torchvision.models.densenet161(pretrained=self.zoo_pretrained)
 				self._est.features.pool0 = Identity()
 				self._est.fc = nn.Linear(self._est.classifier.in_features, self.num_classes)
 		else:

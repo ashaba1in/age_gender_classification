@@ -27,5 +27,6 @@
   "image_save_path": "../data/cropped/",
   "detected_save_path": "../data/detected/",
   "models_path": "../data/models/",
+  "pretrained": true,
   "logging": true
 }
