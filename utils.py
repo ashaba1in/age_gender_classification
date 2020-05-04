@@ -57,69 +57,47 @@ class AgeGender:
             class DoubleOutput(nn.Module):
                 def __init__(self, in_features: int):
                     super(DoubleOutput, self).__init__()
-                    self.fc1 = nn.Linear(in_features, config['num_classes_age'])
-                    self.fc2 = nn.Linear(in_features, config['num_classes_gender'])
+                    self.fc11 = nn.Linear(in_features, in_features // 2)
+                    self.fc12 = nn.Linear(in_features // 2, config['num_classes_age'])
+                    self.fc21 = nn.Linear(in_features, in_features // 2)
+                    self.fc22 = nn.Linear(in_features // 2, config['num_classes_gender'])
 
                 def forward(self, x):
-                    return self.fc1(x), self.fc2(x)
+                    return self.fc12(x), self.fc22(x)
 
             if model_name == 'ResNet-18':
                 self._est = torchvision.models.resnet18(pretrained=self.zoo_pretrained)
-                self._est.pool0 = Identity()
-                self._est.fc = DoubleOutput(self._est.fc.in_features)
-            elif model_name == 'ResNet-34':
-                self._est = torchvision.models.resnet34(pretrained=self.zoo_pretrained)
-                self._est.pool0 = Identity()
-                self._est.fc = DoubleOutput(self._est.fc.in_features)
-            elif model_name == 'ResNet-50':
-                self._est = torchvision.models.resnet50(pretrained=self.zoo_pretrained)
-                self._est.pool0 = Identity()
-                self._est.fc = DoubleOutput(self._est.fc.in_features)
-            elif model_name == 'ResNet-101':
-                self._est = torchvision.models.resnet101(pretrained=self.zoo_pretrained)
                 self._est.pool0 = Identity()
                 self._est.fc = DoubleOutput(self._est.fc.in_features)
             elif model_name == 'ResNet-152':
                 self._est = torchvision.models.resnet152(pretrained=self.zoo_pretrained)
                 self._est.pool0 = Identity()
                 self._est.fc = DoubleOutput(self._est.fc.in_features)
-            elif model_name == 'ResNeXt-50-32x4d':
-                self._est = torchvision.models.resnext50_32x4d(pretrained=self.zoo_pretrained)
-                self._est.pool0 = Identity()
-                self._est.fc = DoubleOutput(self._est.fc.in_features)
             elif model_name == 'ResNeXt-101-32x8d':
                 self._est = torchvision.models.resnext101_32x8d(pretrained=self.zoo_pretrained)
-                self._est.pool0 = Identity()
-                self._est.fc = DoubleOutput(self._est.fc.in_features)
-            elif model_name == 'WideResNet-50-2':
-                self._est = torchvision.models.wide_resnet50_2(pretrained=self.zoo_pretrained)
-                self._est.pool0 = Identity()
-                self._est.fc = DoubleOutput(self._est.fc.in_features)
-            elif model_name == 'WideResNet-101-2':
-                self._est = torchvision.models.wide_resnet101_2(pretrained=self.zoo_pretrained)
                 self._est.pool0 = Identity()
                 self._est.fc = DoubleOutput(self._est.fc.in_features)
             elif model_name == 'Densenet-121':
                 self._est = torchvision.models.densenet121(pretrained=self.zoo_pretrained)
                 self._est.features.pool0 = Identity()
-                self._est.fc = DoubleOutput(self._est.fc.in_features)
-            elif model_name == 'Densenet-169':
-                self._est = torchvision.models.densenet169(pretrained=self.zoo_pretrained)
-                self._est.features.pool0 = Identity()
-                self._est.fc = DoubleOutput(self._est.fc.in_features)
-            elif model_name == 'Densenet-201':
-                self._est = torchvision.models.densenet201(pretrained=self.zoo_pretrained)
-                self._est.features.pool0 = Identity()
-                self._est.fc = DoubleOutput(self._est.fc.in_features)
-            elif model_name == 'Densenet-161':
-                self._est = torchvision.models.densenet161(pretrained=self.zoo_pretrained)
-                self._est.features.pool0 = Identity()
-                self._est.fc = DoubleOutput(self._est.fc.in_features)
+                self._est.classifier = DoubleOutput(self._est.classifier.in_features)
+            else:
+                print(
+                    'Not supported model {}, try one from list {}'.format(
+                        model_name,
+                        [
+                            'ResNet-18',
+                            'ResNet-152',
+                            'ResNeXt-101-32x8d',
+                            'Densenet-121'
+                        ]
+                    )
+                )
         else:
             print('AgeGender name should be from list {}'.format(self.possible_names))
 
         if load_pretrained:
-            self._load_est(os.path.join(path_pretrained, model_name))
+            self._load_est(os.path.join(self.path_pretrained, '{}.pth'.format(model_name)))
 
         self._est.to(self.device)
 
@@ -331,5 +309,5 @@ def print_log(msg: str, debug: bool = config['logging']):
 def parse_utk(filename: str):
     age = int(filename.split('_')[0])
     gender = int(filename.split('_')[1])
-    borders = np.array([0, 2, 4, 6, 8, 13, 15, 20, 25, 32, 38, 43, 48, 53, 1000])
+    borders = np.array([2, 4, 6, 8, 13, 15, 20, 25, 32, 38, 43, 48, 53, 1000])
     return (min(np.where(borders >= age)[0]) + 1) // 2, gender

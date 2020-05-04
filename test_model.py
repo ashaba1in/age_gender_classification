@@ -61,10 +61,10 @@ def test(data_loader, model):
         counts_age[i] += np.sum(data_loader.dataset.targets_age == i)
 
     counts_gender = np.zeros(NUM_CLASSES_GENDER)
-    for i in range(NUM_CLASSES_AGE):
+    for i in range(NUM_CLASSES_GENDER):
         counts_gender[i] += np.sum(data_loader.dataset.targets_gender == i)
 
-    classes = np.array(*(correct_age / counts_age), *(correct_gender / correct_gender))
+    classes = [correct_age / counts_age, correct_gender / counts_gender]
     accuracy_age = np.sum(correct_age) / np.sum(counts_age)
     accuracy_gender = np.sum(correct_gender) / np.sum(counts_gender)
 
@@ -90,21 +90,20 @@ def main(model_name):
     classes, accuracy_age, accuracy_gender = np.array(test(loader, model))
 
     for i in range(NUM_CLASSES_AGE):
-        print_log('AGE CLASS {} correct {:.5%}'.format(i, classes[i]))
+        print_log('AGE CLASS {} correct {:.5%}'.format(i, classes[0][i]))
 
     for i in range(NUM_CLASSES_GENDER):
-        print_log('GENDER CLASS {} correct {:.5%}'.format(i, classes[i + NUM_CLASSES_AGE]))
+        print_log('GENDER CLASS {} correct {:.5%}'.format(i, classes[1][i]))
 
     print_log('total time: {:.5f} seconds'.format(time.perf_counter() - global_start))
 
     dct = {
-        'model': model_name,
         'total_time': time.perf_counter() - global_start,
         'accuracy_AGE': accuracy_age,
         'accuracy_GENDER': accuracy_gender
     }
 
-    pd.DataFrame(dct).to_csv(os.path.join(MODELS_PATH, 'results.csv'), mode='a', header=False)
+    pd.DataFrame(data=dct, index=[model_name]).to_csv(os.path.join(MODELS_PATH, 'results.csv'), mode='a', header=False)
 
 
 if __name__ == '__main__':
