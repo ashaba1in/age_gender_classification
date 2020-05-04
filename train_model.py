@@ -105,7 +105,7 @@ def evaluate(data_loader, model):
 	for i in range(NUM_CLASSES_AGE):
 		counts_gender[i] += np.sum(data_loader.dataset.targets_gender == i)
 
-	return *losses, *(correct_age / counts_age), *(correct_gender / correct_gender)
+	return losses, correct_age / counts_age, correct_gender / correct_gender
 
 
 def main(model_name):
@@ -146,22 +146,22 @@ def main(model_name):
 
 	plt.figure(figsize=(20, 20))
 	plt.title('loss model {}'.format(model_name))
-	plt.plot(history[:, 0], marker='.', label='age')
-	plt.plot(history[:, 1], marker='.', label='gender')
+	plt.plot(history[:, 0][:, 0], marker='.', label='age')
+	plt.plot(history[:, 0][:, 1], marker='.', label='gender')
 	plt.legend()
 	plt.savefig(os.path.join(MODELS_PATH, 'loss_{}.png'.format(model_name)))
 
 	plt.figure(figsize=(20, 20))
 	plt.title('accuracy age model {}'.format(model_name))
 	for i in range(NUM_CLASSES_AGE):
-		plt.plot(history[:, i + 2], marker='.', label='class {}'.format(i))
+		plt.plot(history[:, 1][:, i], marker='.', label='class {}'.format(i))
 	plt.legend()
 	plt.savefig(os.path.join(MODELS_PATH, 'accuracy_age_{}.png'.format(model_name)))
 
 	plt.figure(figsize=(20, 20))
 	plt.title('accuracy gender model {}'.format(model_name))
 	for i in range(NUM_CLASSES_GENDER):
-		plt.plot(history[:, i + 2 + NUM_CLASSES_AGE], marker='.', label='class {}'.format(i))
+		plt.plot(history[:, 2][:, i], marker='.', label='class {}'.format(i))
 	plt.legend()
 	plt.savefig(os.path.join(MODELS_PATH, 'accuracy_gender_{}.png'.format(model_name)))
 
