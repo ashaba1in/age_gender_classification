@@ -50,7 +50,7 @@ def test(data_loader, model):
                 correct_age[i] += pred_age[mask].eq(
                     labels_age[mask].data.view_as(pred_age[mask])).cpu().sum()
 
-            pred_gender = output_age.data.max(1, keepdim=True)[1]
+            pred_gender = output_gender.data.max(1, keepdim=True)[1]
             for i in range(NUM_CLASSES_GENDER):
                 mask = labels_gender == i
                 correct_gender[i] += pred_gender[mask].eq(

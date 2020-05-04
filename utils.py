@@ -59,11 +59,22 @@ class AgeGender:
                     super(DoubleOutput, self).__init__()
                     self.fc11 = nn.Linear(in_features, in_features // 2)
                     self.fc12 = nn.Linear(in_features // 2, config['num_classes_age'])
+                    self.relu = nn.ReLU(inplace=False)
                     self.fc21 = nn.Linear(in_features, in_features // 2)
                     self.fc22 = nn.Linear(in_features // 2, config['num_classes_gender'])
 
+                    nn.init.normal_(self.fc11.weight)
+                    nn.init.normal_(self.fc12.weight)
+                    nn.init.normal_(self.fc21.weight)
+                    nn.init.normal_(self.fc22.weight)
+
+                    nn.init.uniform_(self.fc11.bias)
+                    nn.init.uniform_(self.fc12.bias)
+                    nn.init.uniform_(self.fc21.bias)
+                    nn.init.uniform_(self.fc22.bias)
+
                 def forward(self, x):
-                    return self.fc12(x), self.fc22(x)
+                    return self.fc12(self.relu(self.fc11(x))), self.fc22(self.relu(self.fc21(x)))
 
             if model_name == 'ResNet-18':
                 self._est = torchvision.models.resnet18(pretrained=self.zoo_pretrained)
