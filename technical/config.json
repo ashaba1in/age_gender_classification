@@ -1,0 +1,22 @@
+{
+  "model_names": [
+    "ResNet-18"
+  ],
+  "image_size": 98,
+  "num_classes": 2,
+  "num_classes_age": 101,
+  "num_classes_gender": 2,
+  "use_gpu": true,
+  "batch_size": 4096,
+  "learning_rate": 1e-4,
+  "l2": 1e-6,
+  "num_epochs": 1,
+  "images_path": "../data/train/",
+  "images_save_path": "../data/cropped/",
+  "images_base_path": "../data/images/",
+  "detected_save_path": "../data/detected/",
+  "models_path": "../data/models/",
+  "graphs_path": "../data/graphs/",
+  "pretrained": false,
+  "logging": true
+}

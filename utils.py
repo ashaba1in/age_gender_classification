@@ -1,13 +1,13 @@
 import json
 import multiprocessing
 import os
+from datetime import datetime
 from typing import (
     Any,
     Tuple,
     Union,
 )
 
-import cv2.cv2 as cv2
 import numpy as np
 import pandas as pd
 import torch
@@ -17,11 +17,13 @@ import torch.utils.data
 import torchvision
 import torchvision.transforms as transforms
 from PIL import Image
+from scipy.io import loadmat
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 
 def get_config():
-    with open('config.json', 'r') as _:
+    with open('technical/config.json', 'r') as _:
         return json.load(_)
 
 
@@ -147,7 +149,7 @@ class ImageDataset(torch.utils.data.Dataset):
             transforms_list.extend([
                 transforms.RandomChoice([
                     transforms.ColorJitter(0.5, 0.5, 0.5, 0.5),
-                    transforms.RandomAffine(degrees=20, translate=(0.05, 0.05), scale=(0.7, 1.3), shear=10),
+                    transforms.RandomAffine(degrees=20, translate=(0.05, 0.05), scale=(0.9, 1.1), shear=10),
                     transforms.RandomHorizontalFlip(),
                     transforms.RandomGrayscale(0.05)
                 ])
@@ -160,16 +162,17 @@ class ImageDataset(torch.utils.data.Dataset):
         ])
 
         self.transforms = transforms.Compose(transforms_list)
+
         self.targets_age = dataframe['target_age'].values
         self.targets_gender = dataframe['target_gender'].values
 
     def __getitem__(self, index: int) -> Any:
         filename = self.df['filename'].values[index]
-        sample = Image.open(filename)
-        assert sample.mode == 'RGB'
-        image = self.transforms(sample)
-        if self.mode == 'debug':
-            return image, self.targets_age[index], self.targets_gender[index], filename
+        image = Image.open(filename)
+        assert image.mode == 'RGB'
+
+        image = self.transforms(image)
+
         return image, self.targets_age[index], self.targets_gender[index]
 
     def __len__(self) -> int:
@@ -195,16 +198,20 @@ class Dataset(torch.utils.data.Dataset):
         for i, image_path in enumerate(self.image_paths):
             image = self.read_image(image_path)
 
-            path = self.detected_path.format(i)
-            cv2.imwrite(path, image)
+            faces = [image]  # here u need to detect faces from picture
 
-            self.detected = self.detected.append(
-                {
-                    'image_path': image_path,
-                    'face_path': path
-                },
-                ignore_index=True
-            )
+            for j, face in enumerate(faces):
+                path = self.detected_path.format(i, j)
+
+                face.save(fp=path)
+
+                self.detected = self.detected.append(
+                    {
+                        'image_path': image_path,
+                        'face_path': path
+                    },
+                    ignore_index=True
+                )
 
     def remove_fake_faces(self) -> None:
         drop = []
@@ -222,51 +229,79 @@ class Dataset(torch.utils.data.Dataset):
         gender = torch.LongTensor()
         loader = load_data(self.detected.face_path, mode='inference')
         for images in loader:
-            output = self.age_gender_model(images)
-            output = output.data.max(1, keepdim=True)[1]
-            age = torch.cat((age, output[:, 0]), dim=0)
-            gender = torch.cat((gender, output[:, 1]), dim=0)
+            age_pred, gender_pred = self.age_gender_model(images)
+
+            age_pred = age_pred.data.max(1, keepdim=True)[1]
+            gender_pred = gender_pred.data.max(1, keepdim=True)[1]
+
+            age = torch.cat((age, age_pred), dim=0)
+            gender = torch.cat((gender, gender_pred), dim=0)
+
         self.detected.age = age.numpy()
         self.detected.gender = gender.numpy()
 
     @staticmethod
     def read_image(path, img_size=IMAGE_SIZE):
-        return cv2.resize(cv2.imread(path), (img_size, img_size))
+        sample = Image.open(path)
+        assert sample.mode == 'RGB'
+        return sample.resize((img_size, img_size))
 
 
-class CenterLoss(nn.Module):
-    def __init__(self, num_classes=2, feat_dim=2, use_gpu=True):
-        super(CenterLoss, self).__init__()
-        self.num_classes = num_classes
-        self.feat_dim = feat_dim
-        self.use_gpu = use_gpu
+def calc_age(taken, date_of_birth):
+    date_of_birth = datetime.fromordinal(max(int(date_of_birth) - 366, 1))
 
-        if self.use_gpu:
-            self.centers = nn.Parameter(torch.randn(self.num_classes, self.feat_dim).cuda(), requires_grad=True)
-        else:
-            self.centers = nn.Parameter(torch.randn(self.num_classes, self.feat_dim), requires_grad=True)
-
-    def forward(self, x, labels):
-        batch_size = x.size(0)
-        distmatrix = torch.pow(x, 2).sum(dim=1, keepdim=True).expand(batch_size, self.num_classes)
-        distmatrix += torch.pow(self.centers, 2).sum(dim=1, keepdim=True).expand(self.num_classes, batch_size).t()
-
-        distmatrix.addmm_(x, self.centers.t(), beta=1, alpha=-2)
-
-        classes = torch.arange(self.num_classes).long()
-        if self.use_gpu:
-            classes = classes.cuda()
-
-        labels = labels.unsqueeze(1).expand(batch_size, self.num_classes)
-        mask = labels.eq(classes.expand(batch_size, self.num_classes))
-
-        dist = distmatrix * mask.float()
-        loss = dist.clamp(min=1e-12, max=1e+12).sum() / batch_size
-
-        return loss
+    if date_of_birth.month < 7:
+        return taken - date_of_birth.year
+    else:
+        return taken - date_of_birth.year - 1
 
 
-def get_data(path, collect_targets=True) -> Union[Tuple[np.ndarray, np.ndarray, np.ndarray], np.ndarray]:
+def get_meta(mat_path, db):
+    meta = loadmat(mat_path)[db][0, 0]
+    full_path = meta['full_path'][0]
+    date_of_birth = meta['dob'][0]
+    gender = meta['gender'][0]
+    photo_taken = meta['photo_taken'][0]
+    face_score = meta['face_score'][0]
+    second_face_score = meta['second_face_score'][0]
+    age = [calc_age(photo_taken[i], date_of_birth[i]) for i in range(len(date_of_birth))]
+
+    return full_path, age, gender, face_score, second_face_score
+
+
+def rename_imdb_wiki(path):
+    for base in ['wiki', 'imdb']:
+        total = 0
+        global_path = os.path.join(path, '{}_crop'.format(base))
+        full_path = os.path.join(path, '{}_crop/{}.mat'.format(base, base))
+        full_path, age, gender, face_score, second_face_score = get_meta(full_path, base)
+        for i in tqdm(range(len(age))):
+            bad = False
+            if face_score[i] < 1.:  # noize
+                bad = True
+            if (not np.isnan(second_face_score[i])) and second_face_score[i] > 0.:  # multiple faces
+                bad = True
+            if not (0 <= age[i] <= 100):  # age
+                bad = True
+            if np.isnan(gender[i]):  # gender
+                bad = True
+
+            filename = os.path.join(global_path, full_path[i][0])
+
+            if Image.open(filename).mode != 'RGB':
+                bad = True
+
+            if bad:
+                os.remove(filename)
+            else:
+                dir_name = os.path.dirname(filename)
+                file_name = '{}_{}_{}'.format(i, age[i], int(gender[i])) + os.path.splitext(filename)[1]
+                os.rename(src=filename, dst=os.path.join(dir_name, file_name))
+                total += 1
+        print('Total {} {}'.format(base, total))
+
+
+def get_data(path: str, collect_targets: bool = True) -> Union[Tuple[np.ndarray, np.ndarray, np.ndarray], np.ndarray]:
     filenames = []
     target_age = []
     target_gender = []
@@ -275,7 +310,7 @@ def get_data(path, collect_targets=True) -> Union[Tuple[np.ndarray, np.ndarray, 
         for _file in files:
             filenames.append(os.path.join(root, _file))
             if collect_targets:
-                age, gender = parse_utk(_file)
+                age, gender = tuple(map(int, _file.split('_')[1:3]))
                 target_age.append(age)
                 target_gender.append(gender)
 
@@ -289,26 +324,76 @@ def load_data(
         batch_size: int = config['batch_size'],
         num_workers: int = multiprocessing.cpu_count(),
         use_gpu: bool = config['use_gpu'],
-        mode: str = 'train'
-) -> DataLoader:
+        mode: str = 'train',
+        split_train_test: bool = False
+) -> Union[DataLoader, Tuple[DataLoader, DataLoader]]:
     x, y_age, y_gender = get_data(path)
 
-    df = pd.DataFrame(data={
-        'filename': x,
-        'target_age': y_age,
-        'target_gender': y_gender
-    })
+    if split_train_test:
 
-    shuffle = mode == 'train'
+        test_idx = []
+        test_size = 0.2
 
-    loader = DataLoader(
-        ImageDataset(df, mode=mode),
-        batch_size=batch_size,
-        shuffle=shuffle,
-        num_workers=num_workers,
-        pin_memory=use_gpu
-    )
+        for age in range(config['num_classes_age']):
+            for gender in range(config['num_classes_gender']):
+                mask = (y_age == age) & (y_gender == gender)
+                idx = np.random.choice(
+                    np.where(mask)[0],
+                    size=int(np.sum(mask) * test_size),
+                    replace=False
+                )
+                test_idx.extend(idx)
 
+        test_idx = np.array(test_idx)
+        train_idx = np.ones(len(x), dtype=np.bool)
+        train_idx[test_idx] = 0
+
+        x_train, y_age_train, y_gender_train = x[train_idx], y_age[train_idx], y_gender[train_idx]
+        x_test, y_age_test, y_gender_test = x[test_idx], y_age[test_idx], y_gender[test_idx]
+
+        train = pd.DataFrame(data={
+            'filename': x_train,
+            'target_age': y_age_train,
+            'target_gender': y_gender_train
+        })
+
+        train = DataLoader(
+            ImageDataset(train, mode='train'),
+            batch_size=batch_size,
+            shuffle=True,
+            num_workers=num_workers,
+            pin_memory=use_gpu
+        )
+
+        test = pd.DataFrame(data={
+            'filename': x_test,
+            'target_age': y_age_test,
+            'target_gender': y_gender_test
+        })
+
+        test = DataLoader(
+            ImageDataset(test, mode='test'),
+            batch_size=batch_size,
+            shuffle=False,
+            num_workers=num_workers,
+            pin_memory=use_gpu
+        )
+
+        return train, test
+    else:
+        df = pd.DataFrame(data={
+            'filename': x,
+            'target_age': y_age,
+            'target_gender': y_gender
+        })
+
+        loader = DataLoader(
+            ImageDataset(df, mode=mode),
+            batch_size=batch_size,
+            shuffle=True,
+            num_workers=num_workers,
+            pin_memory=use_gpu
+        )
     return loader
 
 
@@ -316,9 +401,3 @@ def print_log(msg: str, debug: bool = config['logging']):
     if debug:
         print(msg)
 
-
-def parse_utk(filename: str):
-    age = int(filename.split('_')[0])
-    gender = int(filename.split('_')[1])
-    borders = np.array([2, 4, 6, 8, 13, 15, 20, 25, 32, 38, 43, 48, 53, 1000])
-    return (min(np.where(borders >= age)[0]) + 1) // 2, gender
