@@ -18,6 +18,7 @@ import torchvision
 import torchvision.transforms as transforms
 from PIL import Image
 from scipy.io import loadmat
+from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -30,6 +31,17 @@ def get_config():
 config = get_config()
 
 IMAGE_SIZE = config['image_size']
+CROP_SIZE = config['crop_size']
+
+NUM_CLASSES_AGE = config['num_classes_age']
+MAX_AGE = config['max_age']
+AGE_SHIFT = config['age_shift']
+
+FREEZE_LAYERS = None
+try:
+    FREEZE_LAYERS = config['first_layers']
+except KeyError:
+    pass
 
 
 class AgeGender:
@@ -48,51 +60,52 @@ class AgeGender:
         self._est = None
 
         if model_name in self.possible_names:
-            class Identity(nn.Module):
-                def __init__(self):
-                    super(Identity, self).__init__()
-
-                @staticmethod
-                def forward(x):
-                    return x
-
             class DoubleOutput(nn.Module):
                 def __init__(self, in_features: int):
                     super(DoubleOutput, self).__init__()
                     self.fc11 = nn.Linear(in_features, in_features // 2)
                     self.fc12 = nn.Linear(in_features // 2, config['num_classes_age'])
-                    self.relu = nn.ReLU(inplace=False)
                     self.fc21 = nn.Linear(in_features, in_features // 2)
                     self.fc22 = nn.Linear(in_features // 2, config['num_classes_gender'])
-
-                    nn.init.normal_(self.fc11.weight)
-                    nn.init.normal_(self.fc12.weight)
-                    nn.init.normal_(self.fc21.weight)
-                    nn.init.normal_(self.fc22.weight)
-
-                    nn.init.uniform_(self.fc11.bias)
-                    nn.init.uniform_(self.fc12.bias)
-                    nn.init.uniform_(self.fc21.bias)
-                    nn.init.uniform_(self.fc22.bias)
+                    self.relu = nn.ReLU(inplace=False)
+                    self.dr = nn.Dropout(p=0.4)
 
                 def forward(self, x):
-                    return self.fc12(self.relu(self.fc11(x))), self.fc22(self.relu(self.fc21(x)))
+                    age = self.fc12(
+                        self.dr(
+                            self.relu(
+                                self.fc11(
+                                    self.dr(
+                                        x
+                                    )
+                                )
+                            )
+                        )
+                    )
+                    gender = self.fc22(
+                        self.dr(
+                            self.relu(
+                                self.fc21(
+                                    self.dr(
+                                        x
+                                    )
+                                )
+                            )
+                        )
+                    )
+                    return age, gender
 
             if model_name == 'ResNet-18':
                 self._est = torchvision.models.resnet18(pretrained=self.zoo_pretrained)
-                self._est.pool0 = Identity()
                 self._est.fc = DoubleOutput(self._est.fc.in_features)
             elif model_name == 'ResNet-152':
                 self._est = torchvision.models.resnet152(pretrained=self.zoo_pretrained)
-                self._est.pool0 = Identity()
                 self._est.fc = DoubleOutput(self._est.fc.in_features)
             elif model_name == 'ResNeXt-101-32x8d':
                 self._est = torchvision.models.resnext101_32x8d(pretrained=self.zoo_pretrained)
-                self._est.pool0 = Identity()
                 self._est.fc = DoubleOutput(self._est.fc.in_features)
             elif model_name == 'Densenet-121':
                 self._est = torchvision.models.densenet121(pretrained=self.zoo_pretrained)
-                self._est.features.pool0 = Identity()
                 self._est.classifier = DoubleOutput(self._est.classifier.in_features)
             else:
                 print(
@@ -111,6 +124,13 @@ class AgeGender:
 
         if load_pretrained:
             self._load_est(os.path.join(self.path_pretrained, '{}.pth'.format(model_name)))
+            if FREEZE_LAYERS is not None:
+                for i, child in enumerate(self._est.children()):
+                    requires_grad = i >= FREEZE_LAYERS
+                    if requires_grad:
+                        rand_init_layer(child)
+                    for param in child.parameters():
+                        param.requires_grad = requires_grad
 
         self._est.to(self.device)
 
@@ -137,46 +157,49 @@ class AgeGender:
 
 
 class ImageDataset(torch.utils.data.Dataset):
-    def __init__(self, dataframe: pd.DataFrame, mode: str = None) -> None:
+    def __init__(self, data: dict, mode: str = None) -> None:
         super(ImageDataset, self).__init__()
-        self.df = dataframe
+        self.data = data
         self.mode = mode
         self.image_size = IMAGE_SIZE
+        self.crop_size = CROP_SIZE
 
         transforms_list = []
 
         if self.mode == 'train':
             transforms_list.extend([
-                transforms.RandomChoice([
-                    transforms.ColorJitter(0.5, 0.5, 0.5, 0.5),
-                    transforms.RandomAffine(degrees=20, translate=(0.05, 0.05), scale=(0.9, 1.1), shear=10),
-                    transforms.RandomHorizontalFlip(),
-                    transforms.RandomGrayscale(0.05)
-                ])
+                transforms.Resize((self.image_size, self.image_size)),
+                transforms.RandomCrop((self.crop_size, self.crop_size)),
+                transforms.RandomHorizontalFlip()
+            ])
+        else:
+            transforms_list.extend([
+                transforms.Resize((self.image_size, self.image_size)),
+                transforms.CenterCrop((self.crop_size, self.crop_size))
             ])
 
         transforms_list.extend([
-            transforms.Resize((self.image_size, self.image_size)),
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
 
         self.transforms = transforms.Compose(transforms_list)
 
-        self.targets_age = dataframe['target_age'].values
-        self.targets_gender = dataframe['target_gender'].values
+        self.targets_age = self.data['target_age']
+        self.targets_gender = self.data['target_gender']
 
     def __getitem__(self, index: int) -> Any:
-        filename = self.df['filename'].values[index]
+        filename = self.data['filenames'][index]
         image = Image.open(filename)
-        assert image.mode == 'RGB'
+        if image.mode != 'RGB':
+            image = image.convert(mode='RGB')
 
         image = self.transforms(image)
 
         return image, self.targets_age[index], self.targets_gender[index]
 
     def __len__(self) -> int:
-        return self.df.shape[0]
+        return len(self.data['filenames'])
 
 
 class Dataset(torch.utils.data.Dataset):
@@ -243,7 +266,8 @@ class Dataset(torch.utils.data.Dataset):
     @staticmethod
     def read_image(path, img_size=IMAGE_SIZE):
         sample = Image.open(path)
-        assert sample.mode == 'RGB'
+        if sample.mode != 'RGB':
+            sample = sample.convert(mode='RGB')
         return sample.resize((img_size, img_size))
 
 
@@ -277,28 +301,27 @@ def rename_imdb_wiki(path):
         full_path, age, gender, face_score, second_face_score = get_meta(full_path, base)
         for i in tqdm(range(len(age))):
             bad = False
-            if face_score[i] < 1.:  # noize
+            if face_score[i] < 1.:  # noise
                 bad = True
             if (not np.isnan(second_face_score[i])) and second_face_score[i] > 0.:  # multiple faces
                 bad = True
-            if not (0 <= age[i] <= 100):  # age
+            if not (0 <= age[i] <= MAX_AGE):  # age
                 bad = True
             if np.isnan(gender[i]):  # gender
                 bad = True
 
             filename = os.path.join(global_path, full_path[i][0])
 
-            if Image.open(filename).mode != 'RGB':
-                bad = True
-
             if bad:
                 os.remove(filename)
             else:
                 dir_name = os.path.dirname(filename)
-                file_name = '{}_{}_{}'.format(i, age[i], int(gender[i])) + os.path.splitext(filename)[1]
+                file_name = '{}_{}_{}_'.format(i, age[i], int(gender[i])) + os.path.splitext(filename)[1]
                 os.rename(src=filename, dst=os.path.join(dir_name, file_name))
                 total += 1
+
         print('Total {} {}'.format(base, total))
+        os.remove(os.path.join(path, '{}_crop/{}.mat'.format(base, base)))
 
 
 def get_data(path: str, collect_targets: bool = True) -> Union[Tuple[np.ndarray, np.ndarray, np.ndarray], np.ndarray]:
@@ -311,7 +334,13 @@ def get_data(path: str, collect_targets: bool = True) -> Union[Tuple[np.ndarray,
             filenames.append(os.path.join(root, _file))
             if collect_targets:
                 age, gender = tuple(map(int, _file.split('_')[1:3]))
-                target_age.append(age)
+                age_vector = np.zeros(NUM_CLASSES_AGE, dtype=np.float32)
+
+                for i in range(-AGE_SHIFT, AGE_SHIFT + 1):
+                    if 0 <= age + i <= MAX_AGE:
+                        age_vector[age + i] = 1. / (1. + abs(i))
+
+                target_age.append(age_vector)
                 target_gender.append(gender)
 
     if collect_targets:
@@ -330,32 +359,19 @@ def load_data(
     x, y_age, y_gender = get_data(path)
 
     if split_train_test:
+        x_train, x_test, y_age_train, y_age_test, y_gender_train, y_gender_test = train_test_split(
+            x,
+            y_age,
+            y_gender,
+            test_size=config['test_size'],
+            stratify=y_age,
+        )
 
-        test_idx = []
-        test_size = 0.2
-
-        for age in range(config['num_classes_age']):
-            for gender in range(config['num_classes_gender']):
-                mask = (y_age == age) & (y_gender == gender)
-                idx = np.random.choice(
-                    np.where(mask)[0],
-                    size=int(np.sum(mask) * test_size),
-                    replace=False
-                )
-                test_idx.extend(idx)
-
-        test_idx = np.array(test_idx)
-        train_idx = np.ones(len(x), dtype=np.bool)
-        train_idx[test_idx] = 0
-
-        x_train, y_age_train, y_gender_train = x[train_idx], y_age[train_idx], y_gender[train_idx]
-        x_test, y_age_test, y_gender_test = x[test_idx], y_age[test_idx], y_gender[test_idx]
-
-        train = pd.DataFrame(data={
-            'filename': x_train,
+        train = {
+            'filenames': x_train,
             'target_age': y_age_train,
             'target_gender': y_gender_train
-        })
+        }
 
         train = DataLoader(
             ImageDataset(train, mode='train'),
@@ -365,11 +381,11 @@ def load_data(
             pin_memory=use_gpu
         )
 
-        test = pd.DataFrame(data={
-            'filename': x_test,
+        test = {
+            'filenames': x_test,
             'target_age': y_age_test,
             'target_gender': y_gender_test
-        })
+        }
 
         test = DataLoader(
             ImageDataset(test, mode='test'),
@@ -381,14 +397,14 @@ def load_data(
 
         return train, test
     else:
-        df = pd.DataFrame(data={
+        data = {
             'filename': x,
             'target_age': y_age,
             'target_gender': y_gender
-        })
+        }
 
         loader = DataLoader(
-            ImageDataset(df, mode=mode),
+            ImageDataset(data, mode=mode),
             batch_size=batch_size,
             shuffle=True,
             num_workers=num_workers,
@@ -397,7 +413,21 @@ def load_data(
     return loader
 
 
+def rand_init_layer(m):
+    if isinstance(m, nn.Conv2d):
+        n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
+        m.weight.data.normal_(0, np.sqrt(2. / n))
+    elif isinstance(m, nn.BatchNorm2d):
+        m.weight.data.fill_(1)
+        m.bias.data.zero_()
+    elif isinstance(m, nn.Linear):
+        size = m.weight.size()
+        fan_out = size[0]  # number of rows
+        fan_in = size[1]  # number of columns
+        variance = np.sqrt(2.0 / (fan_in + fan_out))
+        m.weight.data.normal_(0.0, variance)
+
+
 def print_log(msg: str, debug: bool = config['logging']):
     if debug:
         print(msg)
-
