@@ -1,6 +1,7 @@
 import json
 import multiprocessing
 import os
+import shutil
 from datetime import datetime
 from typing import (
     Any,
@@ -34,12 +35,13 @@ IMAGE_SIZE = config['image_size']
 CROP_SIZE = config['crop_size']
 
 NUM_CLASSES_AGE = config['num_classes_age']
+NUM_CLASSES_GENDER = config['num_classes_gender']
 MAX_AGE = config['max_age']
 AGE_SHIFT = config['age_shift']
 
 FREEZE_LAYERS = None
 try:
-    FREEZE_LAYERS = config['first_layers']
+    FREEZE_LAYERS = config['freeze']
 except KeyError:
     pass
 
@@ -63,12 +65,12 @@ class AgeGender:
             class DoubleOutput(nn.Module):
                 def __init__(self, in_features: int):
                     super(DoubleOutput, self).__init__()
-                    self.fc11 = nn.Linear(in_features, in_features // 2)
-                    self.fc12 = nn.Linear(in_features // 2, config['num_classes_age'])
-                    self.fc21 = nn.Linear(in_features, in_features // 2)
-                    self.fc22 = nn.Linear(in_features // 2, config['num_classes_gender'])
+                    self.fc11 = nn.Linear(in_features, in_features)
+                    self.fc12 = nn.Linear(in_features, config['num_classes_age'])
+                    self.fc21 = nn.Linear(in_features, in_features)
+                    self.fc22 = nn.Linear(in_features, config['num_classes_gender'])
                     self.relu = nn.ReLU(inplace=False)
-                    self.dr = nn.Dropout(p=0.4)
+                    self.dr = nn.Dropout(p=config['dropout'])
 
                 def forward(self, x):
                     age = self.fc12(
@@ -124,13 +126,6 @@ class AgeGender:
 
         if load_pretrained:
             self._load_est(os.path.join(self.path_pretrained, '{}.pth'.format(model_name)))
-            if FREEZE_LAYERS is not None:
-                for i, child in enumerate(self._est.children()):
-                    requires_grad = i >= FREEZE_LAYERS
-                    if requires_grad:
-                        rand_init_layer(child)
-                    for param in child.parameters():
-                        param.requires_grad = requires_grad
 
         self._est.to(self.device)
 
@@ -154,6 +149,21 @@ class AgeGender:
         else:
             print('Path should lead to correct state dict file of model from list {}'.format(self.possible_names))
             return self
+
+    @staticmethod
+    def freeze(model, epoch: int):
+        try:
+            first_n = FREEZE_LAYERS[str(epoch)]
+        except KeyError:
+            first_n = FREEZE_LAYERS['other']
+
+        for i, child in enumerate(model.children()):
+            requires_grad = i >= first_n
+            if epoch == 0 and requires_grad:
+                rand_init_layer(child)
+            for param in child.parameters():
+                param.requires_grad = requires_grad
+        return model
 
 
 class ImageDataset(torch.utils.data.Dataset):
@@ -271,57 +281,80 @@ class Dataset(torch.utils.data.Dataset):
         return sample.resize((img_size, img_size))
 
 
-def calc_age(taken, date_of_birth):
-    date_of_birth = datetime.fromordinal(max(int(date_of_birth) - 366, 1))
+class ServerSetter:
+    def __init__(self):
+        self.remove = os.remove
+        self.rename = os.rename
+        self.chdir = os.chdir
+        self.mkdir = os.mkdir
+        self.move = shutil.move
+        self.exec = os.system
+        self.join = os.path.join
+        self.paths = config['paths']
+        self.links = config['links']
 
-    if date_of_birth.month < 7:
-        return taken - date_of_birth.year
-    else:
-        return taken - date_of_birth.year - 1
+    def init_directories(self):
+        for path_name in self.paths.keys():
+            self.mkdir(self.paths[path_name])
 
+    def download_unpack_data(self):
+        os.chdir(self.paths['base_path'])
+        for db in self.links.keys():
+            link = self.links[db]
+            print_log('Processing db {}'.format(db))
+            self.exec('wget {}'.format(link))
+            print_log('db {} downloaded...'.format(db))
+            self.exec('tar xf {}_crop.tar --no-same-owner'.format(db))
+            print_log('db {} unpacked...'.format(db))
 
-def get_meta(mat_path, db):
-    meta = loadmat(mat_path)[db][0, 0]
-    full_path = meta['full_path'][0]
-    date_of_birth = meta['dob'][0]
-    gender = meta['gender'][0]
-    photo_taken = meta['photo_taken'][0]
-    face_score = meta['face_score'][0]
-    second_face_score = meta['second_face_score'][0]
-    age = [calc_age(photo_taken[i], date_of_birth[i]) for i in range(len(date_of_birth))]
+    def prepare_data(self):
+        self._delete_noise()
 
-    return full_path, age, gender, face_score, second_face_score
+    def _delete_noise(self):
+        for db in self.links.keys():
+            total = 0
+            self.chdir(self.join(self.paths['base_path'], '{}_crop'.format(db)))
+            full_path, age, gender, face_score, second_face_score = self._get_meta('{}.mat'.format(db), db)
+            for i in tqdm(range(len(age)), desc=db):
+                bad = False
+                if face_score[i] < 1.:  # noise
+                    bad = True
+                elif (not np.isnan(second_face_score[i])) and second_face_score[i] > 0.:  # multiple faces
+                    bad = True
+                elif not (0 <= age[i] <= MAX_AGE):  # age
+                    bad = True
+                elif np.isnan(gender[i]):  # gender
+                    bad = True
 
+                if bad:
+                    self.remove(full_path[i][0])
+                else:
+                    self.rename(src=full_path[i][0], dst='{}_{}_{}_.jpg'.format(i, age[i], int(gender[i])))
+                    total += 1
+            self.remove('{}.mat'.format(db))
+            print('extracted {} images from {}'.format(total, db))
+            self.move(src='{}_crop'.format(db), dst=self.paths['train_path'])
 
-def rename_imdb_wiki(path):
-    for base in ['wiki', 'imdb']:
-        total = 0
-        global_path = os.path.join(path, '{}_crop'.format(base))
-        full_path = os.path.join(path, '{}_crop/{}.mat'.format(base, base))
-        full_path, age, gender, face_score, second_face_score = get_meta(full_path, base)
-        for i in tqdm(range(len(age))):
-            bad = False
-            if face_score[i] < 1.:  # noise
-                bad = True
-            if (not np.isnan(second_face_score[i])) and second_face_score[i] > 0.:  # multiple faces
-                bad = True
-            if not (0 <= age[i] <= MAX_AGE):  # age
-                bad = True
-            if np.isnan(gender[i]):  # gender
-                bad = True
+    def _get_meta(self, mat_path, db):
+        meta = loadmat(mat_path)[db][0, 0]
+        full_path = meta['full_path'][0]
+        date_of_birth = meta['dob'][0]
+        gender = meta['gender'][0]
+        photo_taken = meta['photo_taken'][0]
+        face_score = meta['face_score'][0]
+        second_face_score = meta['second_face_score'][0]
+        age = [self._calc_age(photo_taken[i], date_of_birth[i]) for i in range(len(date_of_birth))]
 
-            filename = os.path.join(global_path, full_path[i][0])
+        return full_path, age, gender, face_score, second_face_score
 
-            if bad:
-                os.remove(filename)
-            else:
-                dir_name = os.path.dirname(filename)
-                file_name = '{}_{}_{}_'.format(i, age[i], int(gender[i])) + os.path.splitext(filename)[1]
-                os.rename(src=filename, dst=os.path.join(dir_name, file_name))
-                total += 1
+    @staticmethod
+    def _calc_age(taken, date_of_birth):
+        date_of_birth = datetime.fromordinal(max(int(date_of_birth) - 366, 1))
 
-        print('Total {} {}'.format(base, total))
-        os.remove(os.path.join(path, '{}_crop/{}.mat'.format(base, base)))
+        if date_of_birth.month < 7:
+            return taken - date_of_birth.year
+        else:
+            return taken - date_of_birth.year - 1
 
 
 def get_data(path: str, collect_targets: bool = True) -> Union[Tuple[np.ndarray, np.ndarray, np.ndarray], np.ndarray]:
@@ -338,10 +371,13 @@ def get_data(path: str, collect_targets: bool = True) -> Union[Tuple[np.ndarray,
 
                 for i in range(-AGE_SHIFT, AGE_SHIFT + 1):
                     if 0 <= age + i <= MAX_AGE:
-                        age_vector[age + i] = 1. / (1. + abs(i))
+                        age_vector[age + i] = 1. / (1. + abs(i)) ** 2
+
+                gender_vector = np.zeros(NUM_CLASSES_GENDER, dtype=np.float32)
+                gender_vector[gender] = 1
 
                 target_age.append(age_vector)
-                target_gender.append(gender)
+                target_gender.append(gender_vector)
 
     if collect_targets:
         return np.array(filenames), np.array(target_age), np.array(target_gender)

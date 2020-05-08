@@ -13,6 +13,13 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from tqdm.autonotebook import tqdm
 import torch
+from torch import (
+    save,
+    sum,
+    abs,
+    nonzero,
+    eq,
+)
 import torch.multiprocessing
 import torch.backends.cudnn as cudnn
 from utils import (
@@ -26,9 +33,11 @@ sns.set(style='darkgrid')
 
 config = get_config()
 
-IMAGE_PATH = config['images_path']
-MODELS_PATH = config['models_path']
-GRAPHS_PATH = config['graphs_path']
+paths = config['paths']
+
+IMAGE_PATH = paths['train_path']
+MODELS_PATH = paths['models_path']
+GRAPHS_PATH = paths['graphs_path']
 
 LEARNING_RATE = config['learning_rate']
 WEIGHT_DECAY = config['l2']
@@ -44,7 +53,6 @@ LOGGING = config['logging']
 
 DEVICE = torch.device("cuda:0" if USE_GPU and torch.cuda.is_available() else "cpu")
 torch.multiprocessing.set_sharing_strategy('file_system')
-torch.backends.cudnn.benchmark = True
 cudnn.benchmark = True
 
 bar_epochs = None
@@ -84,10 +92,10 @@ def train(data_loader, model, optimizer, criterions):
 
         outputs_age, outputs_gender = model(images)
 
-        loss_model = criterion_age(outputs_age, labels_age)
-        loss_model += criterion_gender(outputs_gender, labels_gender) * REDUCE_GENDER
+        loss = criterion_age(outputs_age, labels_age)
+        loss += criterion_gender(outputs_gender, labels_gender) * REDUCE_GENDER
 
-        loss_model.backward()
+        loss.backward()
 
         optimizer.step()
 
@@ -110,21 +118,21 @@ def evaluate(data_loader, model, criterions):
 
             output_age, output_gender = model(images)
 
-            loss += criterion_age(output_age, labels_age).item()
-            loss += criterion_gender(output_gender, labels_gender).item()
+            loss += criterion_age(output_age, labels_age)
+            loss += criterion_gender(output_gender, labels_gender)
 
             pred_age = output_age.data.max(1, keepdim=True)
-            bucket_age += torch.sum(
-                (labels_age[torch.nonzero(torch.eq(output_age, pred_age[0]), as_tuple=True)] > 0).cpu()
+            bucket_age += sum(
+                (labels_age[nonzero(eq(output_age, pred_age[0]), as_tuple=True)] > 0).cpu()
             )
 
-            mae_age += torch.sum(
-                torch.abs(pred_age[1] - labels_age.data.max(1, keepdim=True)[1]).cpu()
+            mae_age += sum(
+                abs(pred_age[1] - labels_age.data.max(1, keepdim=True)[1]).cpu()
             )
 
             pred_gender = output_gender.data.max(1, keepdim=True)[1]
-            correct_gender += torch.sum(
-                pred_gender.eq(labels_gender.data.view_as(pred_gender)).cpu()
+            correct_gender += sum(
+                eq(pred_gender, labels_gender).cpu()
             )
 
             update_bars('inference')
@@ -171,12 +179,12 @@ def plot_results(history, model_name):
 
 
 def main(model_name):
+    global BATCH_SIZE
     print_log('Using DEVICE {}'.format(DEVICE))
     model = AgeGender(model_name=model_name, device=DEVICE).model()
-    global BATCH_SIZE
 
     criterion_age = torch.nn.BCEWithLogitsLoss(reduction='sum')
-    criterion_gender = torch.nn.CrossEntropyLoss(reduction='sum')
+    criterion_gender = torch.nn.BCEWithLogitsLoss(reduction='sum')
 
     optimizer = torch.optim.Adam(
         filter(lambda p: p.requires_grad, model.parameters()),
@@ -184,20 +192,12 @@ def main(model_name):
         weight_decay=WEIGHT_DECAY
     )
 
-    lr_scheduler1 = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer=optimizer,
-        mode='min',
-        factor=0.5,
-        patience=5,
-    )
-
-    lr_scheduler2 = torch.optim.lr_scheduler.MultiStepLR(
+    lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
         optimizer=optimizer,
         milestones=[
-            NUM_EPOCHS // 4,
             NUM_EPOCHS // 2
         ],
-        gamma=0.1
+        gamma=0.2
     )
 
     history = {
@@ -211,6 +211,8 @@ def main(model_name):
         'gender_test': []
     }
 
+    freeze = AgeGender.freeze
+
     epoch = 0
 
     loader_train, loader_test = load_data(path=IMAGE_PATH, batch_size=BATCH_SIZE, split_train_test=True)
@@ -222,7 +224,9 @@ def main(model_name):
 
     while epoch < NUM_EPOCHS:
         try:
+            model = freeze(model, epoch)
             update_bars('reset_train')
+            update_bars('reset_inference')
             train(loader_train, model, optimizer, [criterion_age, criterion_gender])
             epoch += 1
         except RuntimeError as e:
@@ -250,12 +254,11 @@ def main(model_name):
         history['age_test_mae'].append(inference_test[1][1])
         history['gender_test'].append(inference_test[2])
 
-        torch.save(model.state_dict(), os.path.join(MODELS_PATH, '{}.pth'.format(model_name)))
+        save(model.state_dict(), os.path.join(MODELS_PATH, '{}.pth'.format(model_name)))
 
         plot_results(history, model_name)
 
-        lr_scheduler1.step(inference_train[0])
-        lr_scheduler2.step()
+        lr_scheduler.step()
 
         update_bars('epochs')
 
