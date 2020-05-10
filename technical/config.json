@@ -2,21 +2,19 @@
   "model_names": [
     "ResNet-18"
   ],
-  "image_size": 256,
-  "crop_size": 227,
-  "num_classes": 2,
-  "max_age": 99,
-  "num_classes_age": 100,
+  "image_size": 128,
+  "crop_size": 112,
+  "max_age": 100,
+  "num_classes_age": 101,
   "num_classes_gender": 2,
   "dropout": 0.5,
-  "age_shift": 4,
+  "age_shift": 2,
   "use_gpu": true,
-  "batch_size": 128,
-  "test_size": 0.05,
+  "batch_size": 512,
   "learning_rate": 1e-3,
   "l2": 1e-6,
-  "reduce_gender_loss": 1e-1,
-  "num_epochs": 32,
+  "reduce_gender_loss": 0.2,
+  "num_epochs": 100,
   "links": {
     "imdb": "https://data.vision.ee.ethz.ch/cvl/rrothe/imdb-wiki/static/imdb_crop.tar",
     "wiki": "https://data.vision.ee.ethz.ch/cvl/rrothe/imdb-wiki/static/wiki_crop.tar"
@@ -24,22 +22,13 @@
   "paths": {
     "base_path": "data",
     "train_path": "data/train",
+    "test_path": "data/test",
     "cropped_path": "data/cropped",
     "detected_path": "data/detected",
     "models_path": "data/models",
     "graphs_path": "data/graphs"
   },
   "pretrained": true,
-  "freeze": {
-    "1": 8,
-    "2": 8,
-    "3": 7,
-    "4": 6,
-    "5": 5,
-    "6": 4,
-    "7": 3,
-    "8": 2,
-    "other": 1
-  },
+  "freeze": 1,
   "logging": true
 }

@@ -19,7 +19,6 @@ import torchvision
 import torchvision.transforms as transforms
 from PIL import Image
 from scipy.io import loadmat
-from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -39,11 +38,7 @@ NUM_CLASSES_GENDER = config['num_classes_gender']
 MAX_AGE = config['max_age']
 AGE_SHIFT = config['age_shift']
 
-FREEZE_LAYERS = None
-try:
-    FREEZE_LAYERS = config['freeze']
-except KeyError:
-    pass
+FREEZE_LAYERS = config['freeze']
 
 
 class AgeGender:
@@ -65,47 +60,30 @@ class AgeGender:
             class DoubleOutput(nn.Module):
                 def __init__(self, in_features: int):
                     super(DoubleOutput, self).__init__()
-                    self.fc11 = nn.Linear(in_features, in_features)
+                    self.fc1 = nn.Linear(in_features, in_features)
                     self.fc12 = nn.Linear(in_features, config['num_classes_age'])
-                    self.fc21 = nn.Linear(in_features, in_features)
-                    self.fc22 = nn.Linear(in_features, config['num_classes_gender'])
-                    self.relu = nn.ReLU(inplace=False)
+                    self.fc2 = nn.Linear(in_features, in_features // 2)
+                    self.fc22 = nn.Linear(in_features // 2, config['num_classes_gender'])
+                    self.act = nn.ReLU()
                     self.dr = nn.Dropout(p=config['dropout'])
 
                 def forward(self, x):
-                    age = self.fc12(
-                        self.dr(
-                            self.relu(
-                                self.fc11(
-                                    self.dr(
-                                        x
-                                    )
-                                )
-                            )
-                        )
-                    )
-                    gender = self.fc22(
-                        self.dr(
-                            self.relu(
-                                self.fc21(
-                                    self.dr(
-                                        x
-                                    )
-                                )
-                            )
-                        )
-                    )
+                    age = self.fc12(self.dr(self.act(self.fc1(self.dr(x)))))
+                    gender = self.fc22(self.dr(self.act(self.fc2(self.dr(x)))))
+
                     return age, gender
 
             if model_name == 'ResNet-18':
                 self._est = torchvision.models.resnet18(pretrained=self.zoo_pretrained)
                 self._est.fc = DoubleOutput(self._est.fc.in_features)
-            elif model_name == 'ResNet-152':
-                self._est = torchvision.models.resnet152(pretrained=self.zoo_pretrained)
+                if FREEZE_LAYERS:
+                    self._est.conv1.requires_grad = False
+            elif model_name == 'ShuffleNet':
+                self._est = torchvision.models.shufflenet_v2_x0_5(pretrained=self.zoo_pretrained)
                 self._est.fc = DoubleOutput(self._est.fc.in_features)
-            elif model_name == 'ResNeXt-101-32x8d':
-                self._est = torchvision.models.resnext101_32x8d(pretrained=self.zoo_pretrained)
-                self._est.fc = DoubleOutput(self._est.fc.in_features)
+            elif model_name == 'MobileNet_v2':
+                self._est = torchvision.models.mobilenet_v2(pretrained=self.zoo_pretrained)
+                self._est.classifier = DoubleOutput(self._est.classifier[1].in_features)
             elif model_name == 'Densenet-121':
                 self._est = torchvision.models.densenet121(pretrained=self.zoo_pretrained)
                 self._est.classifier = DoubleOutput(self._est.classifier.in_features)
@@ -114,9 +92,9 @@ class AgeGender:
                     'Not supported model {}, try one from list {}'.format(
                         model_name,
                         [
+                            'ShuffleNet',
+                            'MobileNet_v2',
                             'ResNet-18',
-                            'ResNet-152',
-                            'ResNeXt-101-32x8d',
                             'Densenet-121'
                         ]
                     )
@@ -150,20 +128,20 @@ class AgeGender:
             print('Path should lead to correct state dict file of model from list {}'.format(self.possible_names))
             return self
 
-    @staticmethod
-    def freeze(model, epoch: int):
-        try:
-            first_n = FREEZE_LAYERS[str(epoch)]
-        except KeyError:
-            first_n = FREEZE_LAYERS['other']
 
-        for i, child in enumerate(model.children()):
-            requires_grad = i >= first_n
-            if epoch == 0 and requires_grad:
-                rand_init_layer(child)
-            for param in child.parameters():
-                param.requires_grad = requires_grad
-        return model
+def rand_init_layer(m):
+    if isinstance(m, nn.Conv2d):
+        n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
+        m.weight.data.normal_(0, np.sqrt(2. / n))
+    elif isinstance(m, nn.BatchNorm2d):
+        m.weight.data.fill_(1)
+        m.bias.data.zero_()
+    elif isinstance(m, nn.Linear):
+        size = m.weight.size()
+        fan_out = size[0]  # number of rows
+        fan_in = size[1]  # number of columns
+        variance = np.sqrt(2.0 / (fan_in + fan_out))
+        m.weight.data.normal_(0.0, variance)
 
 
 class ImageDataset(torch.utils.data.Dataset):
@@ -179,13 +157,17 @@ class ImageDataset(torch.utils.data.Dataset):
         if self.mode == 'train':
             transforms_list.extend([
                 transforms.Resize((self.image_size, self.image_size)),
-                transforms.RandomCrop((self.crop_size, self.crop_size)),
-                transforms.RandomHorizontalFlip()
+                transforms.RandomResizedCrop(size=self.crop_size, scale=(0.9, 1.1)),
+                transforms.RandomHorizontalFlip(),
+                transforms.RandomApply([
+                    transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
+                ], p=0.1),
+                transforms.RandomGrayscale(p=0.1)
             ])
         else:
             transforms_list.extend([
                 transforms.Resize((self.image_size, self.image_size)),
-                transforms.CenterCrop((self.crop_size, self.crop_size))
+                transforms.CenterCrop((self.crop_size, self.crop_size)),
             ])
 
         transforms_list.extend([
@@ -201,11 +183,11 @@ class ImageDataset(torch.utils.data.Dataset):
     def __getitem__(self, index: int) -> Any:
         filename = self.data['filenames'][index]
         image = Image.open(filename)
-        if image.mode != 'RGB':
-            image = image.convert(mode='RGB')
 
         image = self.transforms(image)
 
+        if self.mode == 'inference':
+            return image
         return image, self.targets_age[index], self.targets_gender[index]
 
     def __len__(self) -> int:
@@ -225,7 +207,7 @@ class Dataset(torch.utils.data.Dataset):
         self.age_gender_model = lambda x: torch.Tensor  # torch based model for predicting age and gender
 
     def collect_images(self) -> None:
-        self.image_paths = get_data(self.image_path, collect_targets=False)
+        self.image_paths = get_data(self.image_path, collect_targets=False, db='')
 
     def detect_faces(self) -> None:
         for i, image_path in enumerate(self.image_paths):
@@ -295,7 +277,10 @@ class ServerSetter:
 
     def init_directories(self):
         for path_name in self.paths.keys():
-            self.mkdir(self.paths[path_name])
+            try:
+                self.mkdir(self.paths[path_name])
+            except FileExistsError:
+                pass
 
     def download_unpack_data(self):
         os.chdir(self.paths['base_path'])
@@ -357,111 +342,62 @@ class ServerSetter:
             return taken - date_of_birth.year - 1
 
 
-def get_data(path: str, collect_targets: bool = True) -> Union[Tuple[np.ndarray, np.ndarray, np.ndarray], np.ndarray]:
+def get_data(path: str, db: str, collect_targets: bool = True) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     filenames = []
     target_age = []
     target_gender = []
 
     for root, _, files in os.walk(path):
-        for _file in files:
-            filenames.append(os.path.join(root, _file))
+        for filename in files:
+            filenames.append(os.path.join(root, filename))
             if collect_targets:
-                age, gender = tuple(map(int, _file.split('_')[1:3]))
+                if db == 'imdb_wiki':
+                    age, gender = tuple(map(int, filename.split('_')[1:3]))
+                else:
+                    age, gender = tuple(map(int, filename.split('/')[-1].split('_')[0:2]))
+                    gender = 1 - gender
+
                 age_vector = np.zeros(NUM_CLASSES_AGE, dtype=np.float32)
+                gender_vector = np.zeros(NUM_CLASSES_GENDER, dtype=np.float32)
 
                 for i in range(-AGE_SHIFT, AGE_SHIFT + 1):
                     if 0 <= age + i <= MAX_AGE:
                         age_vector[age + i] = 1. / (1. + abs(i)) ** 2
 
-                gender_vector = np.zeros(NUM_CLASSES_GENDER, dtype=np.float32)
-                gender_vector[gender] = 1
+                gender_vector[gender] = 1.
 
                 target_age.append(age_vector)
                 target_gender.append(gender_vector)
 
     if collect_targets:
         return np.array(filenames), np.array(target_age), np.array(target_gender)
-    return np.array(filenames)
+    return np.array(filenames), np.empty(0), np.empty(0)
 
 
 def load_data(
         path: str,
         batch_size: int = config['batch_size'],
-        num_workers: int = multiprocessing.cpu_count(),
-        use_gpu: bool = config['use_gpu'],
         mode: str = 'train',
-        split_train_test: bool = False
+        db: str = 'imdb_wiki',
+        collect_targets: bool = True
 ) -> Union[DataLoader, Tuple[DataLoader, DataLoader]]:
-    x, y_age, y_gender = get_data(path)
+    x, y_age, y_gender = get_data(path, collect_targets=collect_targets, db=db)
 
-    if split_train_test:
-        x_train, x_test, y_age_train, y_age_test, y_gender_train, y_gender_test = train_test_split(
-            x,
-            y_age,
-            y_gender,
-            test_size=config['test_size'],
-            stratify=y_age,
-        )
+    data = {
+        'filenames': x,
+        'target_age': y_age,
+        'target_gender': y_gender
+    }
 
-        train = {
-            'filenames': x_train,
-            'target_age': y_age_train,
-            'target_gender': y_gender_train
-        }
+    loader = DataLoader(
+        ImageDataset(data, mode=mode),
+        batch_size=batch_size,
+        shuffle=mode == 'train',
+        num_workers=multiprocessing.cpu_count(),
+        pin_memory=config['use_gpu']
+    )
 
-        train = DataLoader(
-            ImageDataset(train, mode='train'),
-            batch_size=batch_size,
-            shuffle=True,
-            num_workers=num_workers,
-            pin_memory=use_gpu
-        )
-
-        test = {
-            'filenames': x_test,
-            'target_age': y_age_test,
-            'target_gender': y_gender_test
-        }
-
-        test = DataLoader(
-            ImageDataset(test, mode='test'),
-            batch_size=batch_size,
-            shuffle=False,
-            num_workers=num_workers,
-            pin_memory=use_gpu
-        )
-
-        return train, test
-    else:
-        data = {
-            'filename': x,
-            'target_age': y_age,
-            'target_gender': y_gender
-        }
-
-        loader = DataLoader(
-            ImageDataset(data, mode=mode),
-            batch_size=batch_size,
-            shuffle=True,
-            num_workers=num_workers,
-            pin_memory=use_gpu
-        )
     return loader
-
-
-def rand_init_layer(m):
-    if isinstance(m, nn.Conv2d):
-        n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
-        m.weight.data.normal_(0, np.sqrt(2. / n))
-    elif isinstance(m, nn.BatchNorm2d):
-        m.weight.data.fill_(1)
-        m.bias.data.zero_()
-    elif isinstance(m, nn.Linear):
-        size = m.weight.size()
-        fan_out = size[0]  # number of rows
-        fan_in = size[1]  # number of columns
-        variance = np.sqrt(2.0 / (fan_in + fan_out))
-        m.weight.data.normal_(0.0, variance)
 
 
 def print_log(msg: str, debug: bool = config['logging']):

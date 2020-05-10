@@ -1,9 +1,8 @@
 import gc
 import os
-import time
 
 import matplotlib
-import pandas as pd
+import numpy as np
 
 matplotlib.use('Agg')
 
@@ -17,9 +16,10 @@ from torch import (
     save,
     sum,
     abs,
-    nonzero,
     eq,
 )
+from torch.nn.functional import softmax
+from torch.optim.lr_scheduler import MultiStepLR
 import torch.multiprocessing
 import torch.backends.cudnn as cudnn
 from utils import (
@@ -35,7 +35,8 @@ config = get_config()
 
 paths = config['paths']
 
-IMAGE_PATH = paths['train_path']
+TRAIN_PATH = paths['train_path']
+TEST_PATH = paths['test_path']
 MODELS_PATH = paths['models_path']
 GRAPHS_PATH = paths['graphs_path']
 
@@ -45,6 +46,7 @@ REDUCE_GENDER = config['reduce_gender_loss']
 
 NUM_CLASSES_AGE = config['num_classes_age']
 NUM_CLASSES_GENDER = config['num_classes_gender']
+AGE_SHIFT = config['age_shift']
 
 BATCH_SIZE = config['batch_size']
 NUM_EPOCHS = config['num_epochs']
@@ -58,6 +60,8 @@ cudnn.benchmark = True
 bar_epochs = None
 bar_train = None
 bar_inference = None
+
+age_multiplier = torch.from_numpy(np.arange(config['num_classes_age'])).to(DEVICE)
 
 
 def update_bars(msg: str, len1: int = None, len2: int = None):
@@ -90,10 +94,10 @@ def train(data_loader, model, optimizer, criterions):
 
         optimizer.zero_grad()
 
-        outputs_age, outputs_gender = model(images)
+        output_age, output_gender = model(images)
 
-        loss = criterion_age(outputs_age, labels_age)
-        loss += criterion_gender(outputs_gender, labels_gender) * REDUCE_GENDER
+        loss = criterion_age(output_age, labels_age)
+        loss += criterion_gender(output_gender, labels_gender) * REDUCE_GENDER
 
         loss.backward()
 
@@ -118,22 +122,25 @@ def evaluate(data_loader, model, criterions):
 
             output_age, output_gender = model(images)
 
+            pred_age = sum(
+                softmax(output_age, dim=1) * age_multiplier,
+                dim=1,
+                keepdim=True
+            )
+            true_age = labels_age.data.max(1, keepdim=True)[1]
+
             loss += criterion_age(output_age, labels_age)
-            loss += criterion_gender(output_gender, labels_gender)
+            loss += criterion_gender(output_gender, labels_gender) * REDUCE_GENDER
 
-            pred_age = output_age.data.max(1, keepdim=True)
-            bucket_age += sum(
-                (labels_age[nonzero(eq(output_age, pred_age[0]), as_tuple=True)] > 0).cpu()
-            )
+            shift = abs(pred_age - true_age).cpu()
 
-            mae_age += sum(
-                abs(pred_age[1] - labels_age.data.max(1, keepdim=True)[1]).cpu()
-            )
+            bucket_age += sum(shift <= AGE_SHIFT)
+
+            mae_age += sum(shift)
 
             pred_gender = output_gender.data.max(1, keepdim=True)[1]
-            correct_gender += sum(
-                eq(pred_gender, labels_gender).cpu()
-            )
+            true_gender = labels_gender.data.max(1, keepdim=True)[1]
+            correct_gender += sum(eq(pred_gender, true_gender).cpu())
 
             update_bars('inference')
 
@@ -192,13 +199,7 @@ def main(model_name):
         weight_decay=WEIGHT_DECAY
     )
 
-    lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
-        optimizer=optimizer,
-        milestones=[
-            NUM_EPOCHS // 2
-        ],
-        gamma=0.2
-    )
+    lr_scheduler = MultiStepLR(optimizer, milestones=[NUM_EPOCHS // 4, 2 * NUM_EPOCHS // 3], gamma=0.5)
 
     history = {
         'loss_train': [],
@@ -211,20 +212,20 @@ def main(model_name):
         'gender_test': []
     }
 
-    freeze = AgeGender.freeze
+    current_best_loss = np.full(2, fill_value=np.inf)
 
     epoch = 0
 
-    loader_train, loader_test = load_data(path=IMAGE_PATH, batch_size=BATCH_SIZE, split_train_test=True)
+    loader_train = load_data(path=TRAIN_PATH, mode='train')
+    loader_test = load_data(path=TEST_PATH, mode='test')
     gc.collect()
 
-    print_log('Data loaded...')
+    print_log('Data loaded... train {} test {}'.format(len(loader_train.dataset), len(loader_test.dataset)))
 
     update_bars('init', len1=len(loader_train), len2=len(loader_test))
 
     while epoch < NUM_EPOCHS:
         try:
-            model = freeze(model, epoch)
             update_bars('reset_train')
             update_bars('reset_inference')
             train(loader_train, model, optimizer, [criterion_age, criterion_gender])
@@ -233,7 +234,8 @@ def main(model_name):
             if 'CUDA' in str(e):
                 print_log('BATCH SIZE {} too big, trying {}'.format(BATCH_SIZE, BATCH_SIZE // 2))
                 BATCH_SIZE //= 2
-                loader_train, loader_test = load_data(path=IMAGE_PATH, batch_size=BATCH_SIZE, split_train_test=True)
+                loader_train = load_data(path=TRAIN_PATH, batch_size=BATCH_SIZE, mode='train')
+                loader_test = load_data(path=TEST_PATH, batch_size=BATCH_SIZE, mode='test')
                 gc.collect()
                 continue
             else:
@@ -254,33 +256,22 @@ def main(model_name):
         history['age_test_mae'].append(inference_test[1][1])
         history['gender_test'].append(inference_test[2])
 
-        save(model.state_dict(), os.path.join(MODELS_PATH, '{}.pth'.format(model_name)))
+        if current_best_loss[0] >= inference_train[0] and current_best_loss[1] >= inference_test[0]:
+            save(model.state_dict(), os.path.join(MODELS_PATH, '{}{}.pth'.format(model_name, epoch)))
+
+        current_best_loss[0] = min(inference_train[0], current_best_loss[0])
+        current_best_loss[1] = min(inference_test[0], current_best_loss[1])
 
         plot_results(history, model_name)
 
-        lr_scheduler.step()
-
         update_bars('epochs')
+        lr_scheduler.step()
 
     del loader_train, loader_test
 
     torch.cuda.empty_cache()
 
     gc.collect()
-
-    loader = load_data(path=IMAGE_PATH, batch_size=BATCH_SIZE)
-
-    start = time.perf_counter()
-
-    _, age_accuracy, gender_accuracy = evaluate(loader, model, [criterion_age, criterion_gender])
-
-    df = {
-        'time': time.perf_counter() - start,
-        'age_accuracy': age_accuracy,
-        'gender_accuracy': gender_accuracy
-    }
-
-    pd.DataFrame(data=df, index=[model_name]).to_csv(os.path.join(GRAPHS_PATH, 'results.csv'), mode='a', header=False)
 
 
 if __name__ == '__main__':
