@@ -13,9 +13,7 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.multiprocessing
-import torch.nn as nn
 import torch.utils.data
-import torchvision
 import torchvision.transforms as transforms
 from PIL import Image
 from scipy.io import loadmat
@@ -38,111 +36,6 @@ NUM_CLASSES_GENDER = config['num_classes_gender']
 MAX_AGE = config['max_age']
 AGE_SHIFT = config['age_shift']
 
-FREEZE_LAYERS = config['freeze']
-
-
-class AgeGender:
-    def __init__(
-            self,
-            model_name: str,
-            device=None,
-            load_pretrained: bool = False,
-            path_pretrained: str = None
-    ):
-        self.device = device
-        self.zoo_pretrained = config['pretrained']
-        self.path_pretrained = path_pretrained
-        self.possible_names = config['model_names']
-
-        self._est = None
-
-        if model_name in self.possible_names:
-            class DoubleOutput(nn.Module):
-                def __init__(self, in_features: int):
-                    super(DoubleOutput, self).__init__()
-                    self.fc1 = nn.Linear(in_features, in_features)
-                    self.fc12 = nn.Linear(in_features, config['num_classes_age'])
-                    self.fc2 = nn.Linear(in_features, in_features // 2)
-                    self.fc22 = nn.Linear(in_features // 2, config['num_classes_gender'])
-                    self.act = nn.ReLU()
-                    self.dr = nn.Dropout(p=config['dropout'])
-
-                def forward(self, x):
-                    age = self.fc12(self.dr(self.act(self.fc1(self.dr(x)))))
-                    gender = self.fc22(self.dr(self.act(self.fc2(self.dr(x)))))
-
-                    return age, gender
-
-            if model_name == 'ResNet-18':
-                self._est = torchvision.models.resnet18(pretrained=self.zoo_pretrained)
-                self._est.fc = DoubleOutput(self._est.fc.in_features)
-                if FREEZE_LAYERS:
-                    self._est.conv1.requires_grad = False
-            elif model_name == 'ShuffleNet':
-                self._est = torchvision.models.shufflenet_v2_x0_5(pretrained=self.zoo_pretrained)
-                self._est.fc = DoubleOutput(self._est.fc.in_features)
-            elif model_name == 'MobileNet_v2':
-                self._est = torchvision.models.mobilenet_v2(pretrained=self.zoo_pretrained)
-                self._est.classifier = DoubleOutput(self._est.classifier[1].in_features)
-            elif model_name == 'Densenet-121':
-                self._est = torchvision.models.densenet121(pretrained=self.zoo_pretrained)
-                self._est.classifier = DoubleOutput(self._est.classifier.in_features)
-            else:
-                print(
-                    'Not supported model {}, try one from list {}'.format(
-                        model_name,
-                        [
-                            'ShuffleNet',
-                            'MobileNet_v2',
-                            'ResNet-18',
-                            'Densenet-121'
-                        ]
-                    )
-                )
-        else:
-            print('AgeGender name should be from list {}'.format(self.possible_names))
-
-        if load_pretrained:
-            self._load_est(os.path.join(self.path_pretrained, '{}.pth'.format(model_name)))
-
-        self._est.to(self.device)
-
-    def model(self):
-        return self._est
-
-    def _load_est(self, path):
-        model_name = path.split('/')[-1][:-4]
-
-        if model_name in self.possible_names:
-            try:
-                self._est.load_state_dict(torch.load(path))
-            except RuntimeError:
-                print('Path should lead to correct state dict file')
-                return self
-
-            if self.device is not None:
-                self._est.to(self.device)
-            self._est.eval()
-            return self
-        else:
-            print('Path should lead to correct state dict file of model from list {}'.format(self.possible_names))
-            return self
-
-
-def rand_init_layer(m):
-    if isinstance(m, nn.Conv2d):
-        n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
-        m.weight.data.normal_(0, np.sqrt(2. / n))
-    elif isinstance(m, nn.BatchNorm2d):
-        m.weight.data.fill_(1)
-        m.bias.data.zero_()
-    elif isinstance(m, nn.Linear):
-        size = m.weight.size()
-        fan_out = size[0]  # number of rows
-        fan_in = size[1]  # number of columns
-        variance = np.sqrt(2.0 / (fan_in + fan_out))
-        m.weight.data.normal_(0.0, variance)
-
 
 class ImageDataset(torch.utils.data.Dataset):
     def __init__(self, data: dict, mode: str = None) -> None:
@@ -157,12 +50,8 @@ class ImageDataset(torch.utils.data.Dataset):
         if self.mode == 'train':
             transforms_list.extend([
                 transforms.Resize((self.image_size, self.image_size)),
-                transforms.RandomResizedCrop(size=self.crop_size, scale=(0.9, 1.1)),
-                transforms.RandomHorizontalFlip(),
-                transforms.RandomApply([
-                    transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
-                ], p=0.1),
-                transforms.RandomGrayscale(p=0.1)
+                transforms.RandomResizedCrop(size=self.crop_size, scale=(0.95, 1.05)),
+                transforms.RandomHorizontalFlip()
             ])
         else:
             transforms_list.extend([
@@ -347,6 +236,15 @@ def get_data(path: str, db: str, collect_targets: bool = True) -> Tuple[np.ndarr
     target_age = []
     target_gender = []
 
+    def gaussian_prob(true, var=AGE_SHIFT):
+        x = np.arange(0, MAX_AGE + 1, 1)
+        p = np.exp(-np.square(x - true) / (2 * var ** 2)) / (var * (2 * np.pi ** 0.5))
+        return p / p.sum()
+
+    age_vectors = [
+        gaussian_prob(x) for x in range(0, MAX_AGE + 1)
+    ]
+
     for root, _, files in os.walk(path):
         for filename in files:
             filenames.append(os.path.join(root, filename))
@@ -357,17 +255,8 @@ def get_data(path: str, db: str, collect_targets: bool = True) -> Tuple[np.ndarr
                     age, gender = tuple(map(int, filename.split('/')[-1].split('_')[0:2]))
                     gender = 1 - gender
 
-                age_vector = np.zeros(NUM_CLASSES_AGE, dtype=np.float32)
-                gender_vector = np.zeros(NUM_CLASSES_GENDER, dtype=np.float32)
-
-                for i in range(-AGE_SHIFT, AGE_SHIFT + 1):
-                    if 0 <= age + i <= MAX_AGE:
-                        age_vector[age + i] = 1. / (1. + abs(i)) ** 2
-
-                gender_vector[gender] = 1.
-
-                target_age.append(age_vector)
-                target_gender.append(gender_vector)
+                target_age.append(age_vectors[age])
+                target_gender.append(gender)
 
     if collect_targets:
         return np.array(filenames), np.array(target_age), np.array(target_gender)

@@ -16,18 +16,16 @@ from torch import (
     save,
     sum,
     abs,
-    eq,
 )
-from torch.nn.functional import softmax
-from torch.optim.lr_scheduler import MultiStepLR
 import torch.multiprocessing
 import torch.backends.cudnn as cudnn
 from utils import (
     load_data,
-    AgeGender,
     get_config,
     print_log,
 )
+
+from model import Model
 
 sns.set(style='darkgrid')
 
@@ -42,7 +40,6 @@ GRAPHS_PATH = paths['graphs_path']
 
 LEARNING_RATE = config['learning_rate']
 WEIGHT_DECAY = config['l2']
-REDUCE_GENDER = config['reduce_gender_loss']
 
 NUM_CLASSES_AGE = config['num_classes_age']
 NUM_CLASSES_GENDER = config['num_classes_gender']
@@ -96,8 +93,8 @@ def train(data_loader, model, optimizer, criterions):
 
         output_age, output_gender = model(images)
 
-        loss = criterion_age(output_age, labels_age)
-        loss += criterion_gender(output_gender, labels_gender) * REDUCE_GENDER
+        loss = criterion_age(output_age.double(), labels_age.double())
+        loss += criterion_gender(output_gender, labels_gender)
 
         loss.backward()
 
@@ -110,7 +107,7 @@ def evaluate(data_loader, model, criterions):
     model.eval()
 
     loss = 0.
-    bucket_age = 0.
+    cs_age = 0.
     mae_age = 0.
     correct_gender = 0.
 
@@ -122,34 +119,33 @@ def evaluate(data_loader, model, criterions):
 
             output_age, output_gender = model(images)
 
+            loss += criterion_age(output_age.double(), labels_age.double())
+            loss += criterion_gender(output_gender, labels_gender)
+
             pred_age = sum(
-                softmax(output_age, dim=1) * age_multiplier,
+                output_age * age_multiplier,
                 dim=1,
                 keepdim=True
             )
             true_age = labels_age.data.max(1, keepdim=True)[1]
 
-            loss += criterion_age(output_age, labels_age)
-            loss += criterion_gender(output_gender, labels_gender) * REDUCE_GENDER
-
             shift = abs(pred_age - true_age).cpu()
 
-            bucket_age += sum(shift <= AGE_SHIFT)
+            cs_age += sum(shift <= AGE_SHIFT)
 
             mae_age += sum(shift)
 
             pred_gender = output_gender.data.max(1, keepdim=True)[1]
-            true_gender = labels_gender.data.max(1, keepdim=True)[1]
-            correct_gender += sum(eq(pred_gender, true_gender).cpu())
+            correct_gender += sum(pred_gender.eq(labels_gender.data.view_as(pred_gender)).cpu())
 
             update_bars('inference')
 
     loss /= len(data_loader.dataset)
-    bucket_age /= len(data_loader.dataset)
+    cs_age /= len(data_loader.dataset)
     mae_age /= len(data_loader.dataset)
     correct_gender /= len(data_loader.dataset)
 
-    return loss, [bucket_age, mae_age], correct_gender
+    return loss, [cs_age, mae_age], correct_gender
 
 
 def plot_results(history, model_name):
@@ -162,9 +158,9 @@ def plot_results(history, model_name):
     plt.savefig(os.path.join(GRAPHS_PATH, 'loss_{}.png'.format(model_name)))
 
     plt.figure(figsize=(16, 16))
-    plt.title('accuracy bucket age model {}'.format(model_name))
-    plt.plot(history['age_train_bucket'], marker='.', label='train')
-    plt.plot(history['age_test_bucket'], marker='.', label='test')
+    plt.title('CS age model {}'.format(model_name))
+    plt.plot(history['age_train_cs'], marker='.', label='train')
+    plt.plot(history['age_test_cs'], marker='.', label='test')
     plt.legend()
     plt.savefig(os.path.join(GRAPHS_PATH, 'accuracy_bucket_age_{}.png'.format(model_name)))
 
@@ -188,33 +184,10 @@ def plot_results(history, model_name):
 def main(model_name):
     global BATCH_SIZE
     print_log('Using DEVICE {}'.format(DEVICE))
-    model = AgeGender(model_name=model_name, device=DEVICE).model()
+    model = Model().to(DEVICE)
 
-    criterion_age = torch.nn.BCEWithLogitsLoss(reduction='sum')
-    criterion_gender = torch.nn.BCEWithLogitsLoss(reduction='sum')
-
-    optimizer = torch.optim.Adam(
-        filter(lambda p: p.requires_grad, model.parameters()),
-        lr=LEARNING_RATE,
-        weight_decay=WEIGHT_DECAY
-    )
-
-    lr_scheduler = MultiStepLR(optimizer, milestones=[NUM_EPOCHS // 4, 2 * NUM_EPOCHS // 3], gamma=0.5)
-
-    history = {
-        'loss_train': [],
-        'age_train_bucket': [],
-        'age_train_mae': [],
-        'gender_train': [],
-        'loss_test': [],
-        'age_test_bucket': [],
-        'age_test_mae': [],
-        'gender_test': []
-    }
-
-    current_best_loss = np.full(2, fill_value=np.inf)
-
-    epoch = 0
+    criterion_age = torch.nn.BCELoss(reduction='sum')
+    criterion_gender = torch.nn.CrossEntropyLoss(reduction='sum')
 
     loader_train = load_data(path=TRAIN_PATH, mode='train')
     loader_test = load_data(path=TEST_PATH, mode='test')
@@ -224,8 +197,28 @@ def main(model_name):
 
     update_bars('init', len1=len(loader_train), len2=len(loader_test))
 
+    epoch = 0
+    current_best_loss = np.full(2, fill_value=np.inf)
+
+    history = {
+        'loss_train': [],
+        'age_train_cs': [],
+        'age_train_mae': [],
+        'gender_train': [],
+        'loss_test': [],
+        'age_test_cs': [],
+        'age_test_mae': [],
+        'gender_test': []
+    }
+
     while epoch < NUM_EPOCHS:
         try:
+            model.freeze_backbone(epoch)
+            optimizer = torch.optim.Adam(
+                filter(lambda p: p.requires_grad, model.parameters()),
+                lr=LEARNING_RATE,
+                weight_decay=WEIGHT_DECAY,
+            )
             update_bars('reset_train')
             update_bars('reset_inference')
             train(loader_train, model, optimizer, [criterion_age, criterion_gender])
@@ -239,25 +232,30 @@ def main(model_name):
                 gc.collect()
                 continue
             else:
-                print_log(str(e))
-                return
+                raise e
 
         update_bars('reset_inference')
 
         inference_train = evaluate(loader_train, model, [criterion_age, criterion_gender])
-        history['loss_train'].append(inference_train[0])
-        history['age_train_bucket'].append(inference_train[1][0])
-        history['age_train_mae'].append(inference_train[1][1])
-        history['gender_train'].append(inference_train[2])
-
         inference_test = evaluate(loader_test, model, [criterion_age, criterion_gender])
+
+        history['loss_train'].append(inference_train[0])
         history['loss_test'].append(inference_test[0])
-        history['age_test_bucket'].append(inference_test[1][0])
+
+        history['age_train_cs'].append(inference_train[1][0])
+        history['age_test_cs'].append(inference_test[1][0])
+
+        history['age_train_mae'].append(inference_train[1][1])
         history['age_test_mae'].append(inference_test[1][1])
+
+        history['gender_train'].append(inference_train[2])
         history['gender_test'].append(inference_test[2])
 
         if current_best_loss[0] >= inference_train[0] and current_best_loss[1] >= inference_test[0]:
-            save(model.state_dict(), os.path.join(MODELS_PATH, '{}{}.pth'.format(model_name, epoch)))
+            save(model.state_dict(), os.path.join(MODELS_PATH, '{}_{}.pth'.format(model_name, epoch)))
+
+        if not epoch % 10:
+            save(model.state_dict(), os.path.join(MODELS_PATH, '{}.pth'.format(model_name)))
 
         current_best_loss[0] = min(inference_train[0], current_best_loss[0])
         current_best_loss[1] = min(inference_test[0], current_best_loss[1])
@@ -265,13 +263,6 @@ def main(model_name):
         plot_results(history, model_name)
 
         update_bars('epochs')
-        lr_scheduler.step()
-
-    del loader_train, loader_test
-
-    torch.cuda.empty_cache()
-
-    gc.collect()
 
 
 if __name__ == '__main__':

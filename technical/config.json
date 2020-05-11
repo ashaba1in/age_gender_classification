@@ -1,19 +1,19 @@
 {
   "model_names": [
-    "ResNet-18"
+    "double ResNet-18"
   ],
-  "image_size": 128,
-  "crop_size": 112,
+  "image_size": 75,
+  "crop_size": 64,
   "max_age": 100,
+  "age_shift": 4,
   "num_classes_age": 101,
   "num_classes_gender": 2,
-  "dropout": 0.5,
-  "age_shift": 2,
+  "dropout1": 0.2,
+  "dropout2": 0.5,
   "use_gpu": true,
-  "batch_size": 512,
+  "batch_size": 128,
   "learning_rate": 1e-3,
-  "l2": 1e-6,
-  "reduce_gender_loss": 0.2,
+  "l2": 1e-4,
   "num_epochs": 100,
   "links": {
     "imdb": "https://data.vision.ee.ethz.ch/cvl/rrothe/imdb-wiki/static/imdb_crop.tar",
@@ -29,6 +29,6 @@
     "graphs_path": "data/graphs"
   },
   "pretrained": true,
-  "freeze": 1,
+  "freeze": true,
   "logging": true
 }
