@@ -1,6 +1,6 @@
 {
   "model_names": [
-    "double ResNet-18"
+    "dResNet"
   ],
   "image_size": 75,
   "crop_size": 64,
@@ -12,8 +12,14 @@
   "dropout2": 0.5,
   "use_gpu": true,
   "batch_size": 128,
-  "learning_rate": 1e-3,
-  "l2": 1e-4,
+  "learning_rate": {
+    "age": 9e-4,
+    "gender": 1e-3
+  },
+  "weight_decay": {
+    "age": 1e-4,
+    "gender": 1e-6
+  },
   "num_epochs": 100,
   "links": {
     "imdb": "https://data.vision.ee.ethz.ch/cvl/rrothe/imdb-wiki/static/imdb_crop.tar",

@@ -39,7 +39,7 @@ MODELS_PATH = paths['models_path']
 GRAPHS_PATH = paths['graphs_path']
 
 LEARNING_RATE = config['learning_rate']
-WEIGHT_DECAY = config['l2']
+WEIGHT_DECAY = config['weight_decay']
 
 NUM_CLASSES_AGE = config['num_classes_age']
 NUM_CLASSES_GENDER = config['num_classes_gender']
@@ -106,7 +106,8 @@ def train(data_loader, model, optimizer, criterions):
 def evaluate(data_loader, model, criterions):
     model.eval()
 
-    loss = 0.
+    loss_age = 0.
+    loss_gender = 0.
     cs_age = 0.
     mae_age = 0.
     correct_gender = 0.
@@ -119,8 +120,8 @@ def evaluate(data_loader, model, criterions):
 
             output_age, output_gender = model(images)
 
-            loss += criterion_age(output_age.double(), labels_age.double())
-            loss += criterion_gender(output_gender, labels_gender)
+            loss_age += criterion_age(output_age.double(), labels_age.double())
+            loss_gender += criterion_gender(output_gender, labels_gender)
 
             pred_age = sum(
                 output_age * age_multiplier,
@@ -140,38 +141,49 @@ def evaluate(data_loader, model, criterions):
 
             update_bars('inference')
 
-    loss /= len(data_loader.dataset)
+    loss_age /= len(data_loader.dataset)
+    loss_gender /= len(data_loader.dataset)
     cs_age /= len(data_loader.dataset)
     mae_age /= len(data_loader.dataset)
     correct_gender /= len(data_loader.dataset)
 
-    return loss, [cs_age, mae_age], correct_gender
+    return [loss_age, loss_gender], [cs_age, mae_age], correct_gender
 
 
 def plot_results(history, model_name):
-    plt.figure(figsize=(16, 16))
-    plt.title('loss model {}'.format(model_name))
-    plt.plot(history['loss_train'], marker='.', label='train')
-    plt.plot(history['loss_test'], marker='.', label='test')
+    figsize = 13
+
+    plt.figure(figsize=(figsize, figsize))
+    plt.title('loss age model {}'.format(model_name))
+    plt.plot(history['loss_train_age'], marker='.', label='train')
+    plt.plot(history['loss_test_age'], marker='.', label='test')
     plt.yscale('log')
     plt.legend()
-    plt.savefig(os.path.join(GRAPHS_PATH, 'loss_{}.png'.format(model_name)))
+    plt.savefig(os.path.join(GRAPHS_PATH, 'loss_age_{}.png'.format(model_name)))
 
-    plt.figure(figsize=(16, 16))
+    plt.figure(figsize=(figsize, figsize))
+    plt.title('loss gender model {}'.format(model_name))
+    plt.plot(history['loss_train_gender'], marker='.', label='train')
+    plt.plot(history['loss_test_gender'], marker='.', label='test')
+    plt.yscale('log')
+    plt.legend()
+    plt.savefig(os.path.join(GRAPHS_PATH, 'loss_gender_{}.png'.format(model_name)))
+
+    plt.figure(figsize=(figsize, figsize))
     plt.title('CS age model {}'.format(model_name))
     plt.plot(history['age_train_cs'], marker='.', label='train')
     plt.plot(history['age_test_cs'], marker='.', label='test')
     plt.legend()
     plt.savefig(os.path.join(GRAPHS_PATH, 'accuracy_bucket_age_{}.png'.format(model_name)))
 
-    plt.figure(figsize=(16, 16))
+    plt.figure(figsize=(figsize, figsize))
     plt.title('MAE age model {}'.format(model_name))
     plt.plot(history['age_train_mae'], marker='.', label='train')
     plt.plot(history['age_test_mae'], marker='.', label='test')
     plt.legend()
     plt.savefig(os.path.join(GRAPHS_PATH, 'MAE_age_{}.png'.format(model_name)))
 
-    plt.figure(figsize=(16, 16))
+    plt.figure(figsize=(figsize, figsize))
     plt.title('accuracy gender model {}'.format(model_name))
     plt.plot(history['gender_train'], marker='.', label='train')
     plt.plot(history['gender_test'], marker='.', label='test')
@@ -198,14 +210,15 @@ def main(model_name):
     update_bars('init', len1=len(loader_train), len2=len(loader_test))
 
     epoch = 0
-    current_best_loss = np.full(2, fill_value=np.inf)
 
     history = {
-        'loss_train': [],
+        'loss_train_age': [],
+        'loss_train_gender': [],
         'age_train_cs': [],
         'age_train_mae': [],
         'gender_train': [],
-        'loss_test': [],
+        'loss_test_age': [],
+        'loss_test_gender': [],
         'age_test_cs': [],
         'age_test_mae': [],
         'gender_test': []
@@ -215,9 +228,18 @@ def main(model_name):
         try:
             model.freeze_backbone(epoch)
             optimizer = torch.optim.Adam(
-                filter(lambda p: p.requires_grad, model.parameters()),
-                lr=LEARNING_RATE,
-                weight_decay=WEIGHT_DECAY,
+                [
+                    {
+                        'params': filter(lambda p: p.requires_grad, model.params['age']),
+                        'lr': LEARNING_RATE['age'],
+                        'weight_decay': WEIGHT_DECAY['age']
+                    },
+                    {
+                        'params': filter(lambda p: p.requires_grad, model.params['gender']),
+                        'lr': LEARNING_RATE['gender'],
+                        'weight_decay': WEIGHT_DECAY['gender']
+                    }
+                ]
             )
             update_bars('reset_train')
             update_bars('reset_inference')
@@ -239,8 +261,11 @@ def main(model_name):
         inference_train = evaluate(loader_train, model, [criterion_age, criterion_gender])
         inference_test = evaluate(loader_test, model, [criterion_age, criterion_gender])
 
-        history['loss_train'].append(inference_train[0])
-        history['loss_test'].append(inference_test[0])
+        history['loss_train_age'].append(inference_train[0][0])
+        history['loss_test_age'].append(inference_test[0][0])
+
+        history['loss_train_gender'].append(inference_train[0][1])
+        history['loss_test_gender'].append(inference_test[0][1])
 
         history['age_train_cs'].append(inference_train[1][0])
         history['age_test_cs'].append(inference_test[1][0])
@@ -251,14 +276,8 @@ def main(model_name):
         history['gender_train'].append(inference_train[2])
         history['gender_test'].append(inference_test[2])
 
-        if current_best_loss[0] >= inference_train[0] and current_best_loss[1] >= inference_test[0]:
-            save(model.state_dict(), os.path.join(MODELS_PATH, '{}_{}.pth'.format(model_name, epoch)))
-
         if not epoch % 10:
-            save(model.state_dict(), os.path.join(MODELS_PATH, '{}.pth'.format(model_name)))
-
-        current_best_loss[0] = min(inference_train[0], current_best_loss[0])
-        current_best_loss[1] = min(inference_test[0], current_best_loss[1])
+            save(model.state_dict(), os.path.join(MODELS_PATH, '{}_{}.pth'.format(model_name, epoch)))
 
         plot_results(history, model_name)
 

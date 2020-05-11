@@ -236,6 +236,11 @@ class Model(nn.Module):
         self.backbone2 = ResNet(BasicBlock, [2, 2, 2, 2])
         self.head2 = GenderHead(self.backbone2.fc.in_features)
 
+        self.params = {
+            'age': list(self.backbone1.parameters()) + list(self.head1.parameters()),
+            'gender': list(self.backbone2.parameters()) + list(self.head2.parameters())
+        }
+
         if config['pretrained']:
             state_dict = load_state_dict_from_url('https://download.pytorch.org/models/resnet18-5c106cde.pth')
             self.backbone1.load_state_dict(state_dict)
