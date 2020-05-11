@@ -5,7 +5,7 @@
   "image_size": 75,
   "crop_size": 64,
   "max_age": 100,
-  "age_shift": 4,
+  "age_shift": 2,
   "num_classes_age": 101,
   "num_classes_gender": 2,
   "dropout1": 0.2,
@@ -13,12 +13,12 @@
   "use_gpu": true,
   "batch_size": 128,
   "learning_rate": {
-    "age": 9e-4,
-    "gender": 1e-3
+    "age": 1e-5,
+    "gender": 5e-4
   },
   "weight_decay": {
-    "age": 1e-4,
-    "gender": 1e-6
+    "age": 1e-3,
+    "gender": 1e-5
   },
   "num_epochs": 100,
   "links": {
@@ -35,6 +35,10 @@
     "graphs_path": "data/graphs"
   },
   "pretrained": true,
-  "freeze": true,
+  "freeze": {
+    "backbone": false,
+    "epochs": 2,
+    "first": true
+  },
   "logging": true
 }

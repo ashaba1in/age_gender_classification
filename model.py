@@ -15,7 +15,7 @@ config = get_config()
 NUM_CLASSES_AGE = config['num_classes_age']
 NUM_CLASSES_GENDER = config['num_classes_gender']
 
-FREEZE_LAYERS = config['freeze']
+FREEZE = config['freeze']
 
 
 def conv3x3(in_planes, out_planes, stride=1, groups=1, dilation=1):
@@ -255,9 +255,9 @@ class Model(nn.Module):
     def _load_pretrained(self, path):
         self.load_state_dict(torch.load(path))
 
-    def freeze_backbone(self, epoch):
-        if FREEZE_LAYERS:
-            if epoch <= 2:
+    def freeze(self, epoch):
+        if FREEZE['backbone']:
+            if epoch < FREEZE['epochs']:
                 for child in self.backbone1.children():
                     for param in child.parameters():
                         param.requires_grad = False
@@ -273,6 +273,15 @@ class Model(nn.Module):
                     if name != 'conv1':
                         for param in child.parameters():
                             param.requires_grad = True
+        if FREEZE['first']:
+            for name, child in self.backbone1.named_children():
+                if name != 'conv1':
+                    for param in child.parameters():
+                        param.requires_grad = True
+            for name, child in self.backbone1.named_children():
+                if name != 'conv1':
+                    for param in child.parameters():
+                        param.requires_grad = True
 
 
 def rand_init_layer(m):

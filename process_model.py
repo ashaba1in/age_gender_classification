@@ -174,7 +174,7 @@ def plot_results(history, model_name):
     plt.plot(history['age_train_cs'], marker='.', label='train')
     plt.plot(history['age_test_cs'], marker='.', label='test')
     plt.legend()
-    plt.savefig(os.path.join(GRAPHS_PATH, 'accuracy_bucket_age_{}.png'.format(model_name)))
+    plt.savefig(os.path.join(GRAPHS_PATH, 'CS_age_{}.png'.format(model_name)))
 
     plt.figure(figsize=(figsize, figsize))
     plt.title('MAE age model {}'.format(model_name))
@@ -226,7 +226,7 @@ def main(model_name):
 
     while epoch < NUM_EPOCHS:
         try:
-            model.freeze_backbone(epoch)
+            model.freeze(epoch)
             optimizer = torch.optim.Adam(
                 [
                     {
