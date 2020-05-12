@@ -17,17 +17,17 @@
   "learning_rate": {
     "age": {
       "milestones": {
-        "5": 1e-5,
-        "20": 1e-6
+        "5": 1e-3,
+        "20": 1e-4
       },
-      "other": 5e-7
+      "other": 5e-5
     },
     "gender": {
       "milestones": {
-        "5": 1e-5,
-        "20": 1e-6
+        "5": 1e-3,
+        "20": 1e-4
       },
-      "other": 5e-7
+      "other": 5e-5
     }
   },
   "weight_decay": {

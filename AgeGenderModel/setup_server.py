@@ -3,8 +3,8 @@ from utils import ServerSetter
 
 def main():
     worker = ServerSetter()
-    # worker.init_directories()
-    # worker.download_unpack_data()
+    worker.init_directories()
+    worker.download_unpack_data()
     worker.prepare_data()
 
 
