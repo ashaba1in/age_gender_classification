@@ -62,17 +62,19 @@ age_multiplier = torch.from_numpy(np.arange(config['num_classes_age'])).to(DEVIC
 
 
 def get_lr(epoch, key):
-    if str(epoch) in LEARNING_RATE[key]:
-        return LEARNING_RATE[key][str(epoch)]
-    else:
-        return LEARNING_RATE[key]['other']
+    milestones = LEARNING_RATE[key]['milestones']
+    for milestone in milestones.keys():
+        if epoch > int(milestone):
+            return milestones[milestone]
+    return LEARNING_RATE[key]['other']
 
 
 def get_wd(epoch, key):
-    if str(epoch) in WEIGHT_DECAY[key]:
-        return WEIGHT_DECAY[key][str(epoch)]
-    else:
-        return WEIGHT_DECAY[key]['other']
+    milestones = WEIGHT_DECAY[key]['milestones']
+    for milestone in milestones.keys():
+        if epoch > int(milestone):
+            return milestones[milestone]
+    return WEIGHT_DECAY[key]['other']
 
 
 def update_bars(msg: str, len1: int = None, len2: int = None):
@@ -217,8 +219,6 @@ def main(model_name):
 
     print_log('Data loaded... train {} test {}'.format(len(loader_train.dataset), len(loader_test.dataset)))
 
-    update_bars('init', len1=len(loader_train), len2=len(loader_test))
-
     epoch = 0
 
     history = {
@@ -238,18 +238,37 @@ def main(model_name):
     criterion_gender = torch.nn.CrossEntropyLoss(reduction='sum')
 
     model = Model().to(DEVICE)
+    for param in model.freeze_parameters(0):
+        param.requires_grad = False
+
+    total = 0
+    trainable = 0
+
+    for _ in model.parameters():
+        total += _.numel()
+        if _.requires_grad:
+            trainable += _.numel()
+
+    print_log('Model ready... total {} params, trainable {} params'.format(total, trainable))
+
+    update_bars('init', len1=len(loader_train), len2=len(loader_test))
 
     while epoch < NUM_EPOCHS:
         try:
+            for param in model.parameters():
+                param.requires_grad = True
+            for param in model.freeze_parameters(epoch):
+                param.requires_grad = False
+
             optimizer = torch.optim.Adam(
                 [
                     {
-                        'params': filter(lambda p: p.requires_grad, model.params['age']),
+                        'params': filter(lambda _: _.requires_grad, model.params['age']),
                         'lr': get_lr(epoch, 'age'),
                         'weight_decay': get_wd(epoch, 'age')
                     },
                     {
-                        'params': filter(lambda p: p.requires_grad, model.params['gender']),
+                        'params': filter(lambda _: _.requires_grad, model.params['gender']),
                         'lr': get_lr(epoch, 'gender'),
                         'weight_decay': get_wd(epoch, 'gender')
                     }
@@ -290,8 +309,7 @@ def main(model_name):
         history['gender_train'].append(inference_train[2])
         history['gender_test'].append(inference_test[2])
 
-        if not epoch % 10:
-            save(model.state_dict(), os.path.join(MODELS_PATH, '{}_{}.pth'.format(model_name, epoch)))
+        save(model.state_dict(), os.path.join(MODELS_PATH, '{}_{}.pth'.format(model_name, epoch)))
 
         plot_results(history, model_name)
 

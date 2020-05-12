@@ -49,8 +49,8 @@ class ImageDataset(torch.utils.data.Dataset):
 
         if self.mode == 'train':
             transforms_list.extend([
-                transforms.Resize((self.image_size, self.image_size)),
-                transforms.RandomResizedCrop(size=self.crop_size, scale=(0.95, 1.05)),
+                transforms.Resize(size=(self.image_size, self.image_size)),
+                transforms.RandomCrop(size=(self.crop_size, self.crop_size)),
                 transforms.RandomHorizontalFlip()
             ])
         else:
@@ -71,7 +71,7 @@ class ImageDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, index: int) -> Any:
         filename = self.data['filenames'][index]
-        image = Image.open(filename)
+        image = Image.open(filename).convert('RGB')
 
         image = self.transforms(image)
 
@@ -250,7 +250,10 @@ def get_data(path: str, db: str, collect_targets: bool = True) -> Tuple[np.ndarr
             filenames.append(os.path.join(root, filename))
             if collect_targets:
                 if db == 'imdb_wiki':
-                    age, gender = tuple(map(int, filename.split('_')[1:3]))
+                    try:
+                        age, gender = tuple(map(int, filename.split('_')[1:3]))
+                    except ValueError:
+                        continue
                 else:
                     age, gender = tuple(map(int, filename.split('/')[-1].split('_')[0:2]))
                     gender = 1 - gender

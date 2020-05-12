@@ -1,4 +1,3 @@
-import numpy as np
 import torch
 import torch.multiprocessing
 import torch.nn as nn
@@ -141,6 +140,7 @@ class ResNet(nn.Module):
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2,
                                        dilate=replace_stride_with_dilation[2])
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.dr = nn.Dropout(p=config['dropout3'])
         self.fc = nn.Linear(512 * block.expansion, num_classes)
 
         for m in self.modules():
@@ -189,6 +189,7 @@ class ResNet(nn.Module):
         x = self.layer1(x)
         x = self.layer2(x)
         x = self.layer3(x)
+        x = self.dr(x)
         x = self.layer4(x)
 
         x = self.avgpool(x)
@@ -231,6 +232,7 @@ class Model(nn.Module):
         super(Model, self).__init__()
 
         self.backbone1 = ResNet(BasicBlock, [2, 2, 2, 2])
+
         self.head1 = AgeHead(self.backbone1.fc.in_features)
 
         self.backbone2 = ResNet(BasicBlock, [2, 2, 2, 2])
@@ -255,45 +257,19 @@ class Model(nn.Module):
     def _load_pretrained(self, path):
         self.load_state_dict(torch.load(path))
 
-    def freeze(self, epoch):
-        if FREEZE['backbone']:
-            if epoch < FREEZE['epochs']:
-                for child in self.backbone1.children():
-                    for param in child.parameters():
-                        param.requires_grad = False
-                for child in self.backbone2.children():
-                    for param in child.parameters():
-                        param.requires_grad = False
-            else:
-                for name, child in self.backbone1.named_children():
-                    if name != 'conv1':
-                        for param in child.parameters():
-                            param.requires_grad = True
-                for name, child in self.backbone1.named_children():
-                    if name != 'conv1':
-                        for param in child.parameters():
-                            param.requires_grad = True
+    def freeze_parameters(self, epoch):
+        params = []
+        if FREEZE['backbone'] and epoch < FREEZE['epochs']:
+            params.extend(self.backbone1.layer1.parameters())
+            params.extend(self.backbone1.layer2.parameters())
+            params.extend(self.backbone1.layer3.parameters())
+
+            params.extend(self.backbone2.layer1.parameters())
+            params.extend(self.backbone2.layer2.parameters())
+            params.extend(self.backbone2.layer3.parameters())
+
         if FREEZE['first']:
-            for name, child in self.backbone1.named_children():
-                if name != 'conv1':
-                    for param in child.parameters():
-                        param.requires_grad = True
-            for name, child in self.backbone1.named_children():
-                if name != 'conv1':
-                    for param in child.parameters():
-                        param.requires_grad = True
+            params.extend(self.backbone1.conv1.parameters())
+            params.extend(self.backbone2.conv1.parameters())
 
-
-def rand_init_layer(m):
-    if isinstance(m, nn.Conv2d):
-        n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
-        m.weight.data.normal_(0, np.sqrt(2. / n))
-    elif isinstance(m, nn.BatchNorm2d):
-        m.weight.data.fill_(1)
-        m.bias.data.zero_()
-    elif isinstance(m, nn.Linear):
-        size = m.weight.size()
-        fan_out = size[0]  # number of rows
-        fan_in = size[1]  # number of columns
-        variance = np.sqrt(2.0 / (fan_in + fan_out))
-        m.weight.data.normal_(0.0, variance)
+        return params

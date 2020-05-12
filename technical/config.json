@@ -10,26 +10,41 @@
   "num_classes_age": 101,
   "num_classes_gender": 2,
   "dropout1": 0.2,
-  "dropout2": 0.4,
+  "dropout2": 0.5,
+  "dropout3": 0.1,
   "use_gpu": true,
   "batch_size": 128,
   "learning_rate": {
     "age": {
-      "other": 1e-4
+      "milestones": {
+        "5": 1e-5,
+        "20": 1e-6
+      },
+      "other": 5e-7
     },
     "gender": {
-      "other": 1e-4
+      "milestones": {
+        "5": 1e-5,
+        "20": 1e-6
+      },
+      "other": 5e-7
     }
   },
   "weight_decay": {
     "age": {
+      "milestones": {
+        "5": 1e-5
+      },
       "other": 1e-3
     },
     "gender": {
+      "milestones": {
+        "5": 1e-5
+      },
       "other": 1e-3
     }
   },
-  "num_epochs": 100,
+  "num_epochs": 32,
   "links": {
     "imdb": "https://data.vision.ee.ethz.ch/cvl/rrothe/imdb-wiki/static/imdb_crop.tar",
     "wiki": "https://data.vision.ee.ethz.ch/cvl/rrothe/imdb-wiki/static/wiki_crop.tar"
@@ -45,8 +60,8 @@
   },
   "pretrained": true,
   "freeze": {
-    "backbone": false,
-    "epochs": 2,
+    "backbone": true,
+    "epochs": 5,
     "first": true
   },
   "logging": true
