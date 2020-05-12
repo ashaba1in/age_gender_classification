@@ -2,7 +2,7 @@ import argparse
 import torch
 import torch.nn.functional as F
 import numpy as np
-from RetinaFace import eval_widerface
+from FaceDetectionModel import eval_widerface
 import os
 from PIL import Image
 import matplotlib.pyplot as plt
