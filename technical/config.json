@@ -1,24 +1,33 @@
 {
   "model_names": [
-    "dResNet"
+    "ResNet"
   ],
-  "image_size": 75,
-  "crop_size": 64,
+  "image_size": 256,
+  "crop_size": 227,
   "max_age": 100,
-  "age_shift": 2,
+  "age_shift": 2.5,
+  "cs": 5,
   "num_classes_age": 101,
   "num_classes_gender": 2,
   "dropout1": 0.2,
-  "dropout2": 0.5,
+  "dropout2": 0.4,
   "use_gpu": true,
   "batch_size": 128,
   "learning_rate": {
-    "age": 1e-5,
-    "gender": 5e-4
+    "age": {
+      "other": 1e-4
+    },
+    "gender": {
+      "other": 1e-4
+    }
   },
   "weight_decay": {
-    "age": 1e-3,
-    "gender": 1e-5
+    "age": {
+      "other": 1e-3
+    },
+    "gender": {
+      "other": 1e-3
+    }
   },
   "num_epochs": 100,
   "links": {

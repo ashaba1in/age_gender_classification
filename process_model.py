@@ -43,7 +43,7 @@ WEIGHT_DECAY = config['weight_decay']
 
 NUM_CLASSES_AGE = config['num_classes_age']
 NUM_CLASSES_GENDER = config['num_classes_gender']
-AGE_SHIFT = config['age_shift']
+CS_SCORE = config['cs']
 
 BATCH_SIZE = config['batch_size']
 NUM_EPOCHS = config['num_epochs']
@@ -59,6 +59,20 @@ bar_train = None
 bar_inference = None
 
 age_multiplier = torch.from_numpy(np.arange(config['num_classes_age'])).to(DEVICE)
+
+
+def get_lr(epoch, key):
+    if str(epoch) in LEARNING_RATE[key]:
+        return LEARNING_RATE[key][str(epoch)]
+    else:
+        return LEARNING_RATE[key]['other']
+
+
+def get_wd(epoch, key):
+    if str(epoch) in WEIGHT_DECAY[key]:
+        return WEIGHT_DECAY[key][str(epoch)]
+    else:
+        return WEIGHT_DECAY[key]['other']
 
 
 def update_bars(msg: str, len1: int = None, len2: int = None):
@@ -132,7 +146,7 @@ def evaluate(data_loader, model, criterions):
 
             shift = abs(pred_age - true_age).cpu()
 
-            cs_age += sum(shift <= AGE_SHIFT)
+            cs_age += sum(shift <= CS_SCORE)
 
             mae_age += sum(shift)
 
@@ -196,10 +210,6 @@ def plot_results(history, model_name):
 def main(model_name):
     global BATCH_SIZE
     print_log('Using DEVICE {}'.format(DEVICE))
-    model = Model().to(DEVICE)
-
-    criterion_age = torch.nn.BCELoss(reduction='sum')
-    criterion_gender = torch.nn.CrossEntropyLoss(reduction='sum')
 
     loader_train = load_data(path=TRAIN_PATH, mode='train')
     loader_test = load_data(path=TEST_PATH, mode='test')
@@ -224,20 +234,24 @@ def main(model_name):
         'gender_test': []
     }
 
+    criterion_age = torch.nn.BCELoss(reduction='sum')
+    criterion_gender = torch.nn.CrossEntropyLoss(reduction='sum')
+
+    model = Model().to(DEVICE)
+
     while epoch < NUM_EPOCHS:
         try:
-            model.freeze(epoch)
             optimizer = torch.optim.Adam(
                 [
                     {
                         'params': filter(lambda p: p.requires_grad, model.params['age']),
-                        'lr': LEARNING_RATE['age'],
-                        'weight_decay': WEIGHT_DECAY['age']
+                        'lr': get_lr(epoch, 'age'),
+                        'weight_decay': get_wd(epoch, 'age')
                     },
                     {
                         'params': filter(lambda p: p.requires_grad, model.params['gender']),
-                        'lr': LEARNING_RATE['gender'],
-                        'weight_decay': WEIGHT_DECAY['gender']
+                        'lr': get_lr(epoch, 'gender'),
+                        'weight_decay': get_wd(epoch, 'gender')
                     }
                 ]
             )
