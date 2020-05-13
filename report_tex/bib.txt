@@ -1,0 +1,2 @@
+https://data.vision.ee.ethz.ch/cvl/publications/papers/articles/eth_biwi_01299.pdf - IMDB-WIKI
+https://arxiv.org/abs/1512.03385 - ResNet
