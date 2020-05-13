@@ -10,38 +10,34 @@
   "num_classes_age": 101,
   "num_classes_gender": 2,
   "dropout1": 0.2,
-  "dropout2": 0.5,
+  "dropout2": 0.2,
   "dropout3": 0.1,
   "use_gpu": true,
   "batch_size": 128,
   "learning_rate": {
     "age": {
       "milestones": {
-        "5": 1e-3,
+        "8": 1e-3,
         "20": 1e-4
       },
-      "other": 5e-5
+      "other": 1e-5
     },
     "gender": {
       "milestones": {
-        "5": 1e-3,
+        "8": 1e-3,
         "20": 1e-4
       },
-      "other": 5e-5
+      "other": 1e-5
     }
   },
   "weight_decay": {
     "age": {
-      "milestones": {
-        "5": 1e-5
-      },
-      "other": 1e-3
+      "milestones": {},
+      "other": 1e-6
     },
     "gender": {
-      "milestones": {
-        "5": 1e-5
-      },
-      "other": 1e-3
+      "milestones": {},
+      "other": 1e-6
     }
   },
   "num_epochs": 32,
@@ -56,12 +52,13 @@
     "cropped_path": "data/cropped",
     "detected_path": "data/detected",
     "models_path": "data/models",
-    "graphs_path": "data/graphs"
+    "graphs_path": "data/graphs",
+    "adience": "data/adience"
   },
   "pretrained": true,
   "freeze": {
-    "backbone": true,
-    "epochs": 5,
+    "backbone": false,
+    "epochs": 3,
     "first": true
   },
   "logging": true

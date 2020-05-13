@@ -1,7 +1,6 @@
 import torch
 import torch.multiprocessing
 import torch.nn as nn
-import torch.nn.functional as f
 import torch.utils.data
 from torch.utils.model_zoo import load_url as load_state_dict_from_url
 
@@ -211,7 +210,7 @@ class AgeHead(nn.Module):
         self.dr2 = nn.Dropout(p=config['dropout2'])
 
     def forward(self, x):
-        return f.softmax(self.fc2(self.dr2(self.act(self.fc1(self.dr1(x))))), 1)
+        return self.fc2(self.dr2(self.act(self.fc1(self.dr1(x)))))
 
 
 class GenderHead(nn.Module):
@@ -262,11 +261,8 @@ class Model(nn.Module):
         if FREEZE['backbone'] and epoch < FREEZE['epochs']:
             params.extend(self.backbone1.layer1.parameters())
             params.extend(self.backbone1.layer2.parameters())
-            params.extend(self.backbone1.layer3.parameters())
-
             params.extend(self.backbone2.layer1.parameters())
             params.extend(self.backbone2.layer2.parameters())
-            params.extend(self.backbone2.layer3.parameters())
 
         if FREEZE['first']:
             params.extend(self.backbone1.conv1.parameters())

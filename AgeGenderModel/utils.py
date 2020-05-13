@@ -6,7 +6,6 @@ from datetime import datetime
 from typing import (
     Any,
     Tuple,
-    Union,
 )
 
 import numpy as np
@@ -239,7 +238,7 @@ def get_data(path: str, db: str, collect_targets: bool = True) -> Tuple[np.ndarr
     def gaussian_prob(true, var=AGE_SHIFT):
         x = np.arange(0, MAX_AGE + 1, 1)
         p = np.exp(-np.square(x - true) / (2 * var ** 2)) / (var * (2 * np.pi ** 0.5))
-        return p / p.sum()
+        return p / p.max()
 
     age_vectors = [
         gaussian_prob(x) for x in range(0, MAX_AGE + 1)
@@ -250,10 +249,7 @@ def get_data(path: str, db: str, collect_targets: bool = True) -> Tuple[np.ndarr
             filenames.append(os.path.join(root, filename))
             if collect_targets:
                 if db == 'imdb_wiki':
-                    try:
-                        age, gender = tuple(map(int, filename.split('_')[1:3]))
-                    except ValueError:
-                        continue
+                    age, gender = tuple(map(int, filename.split('_')[1:3]))
                 else:
                     age, gender = tuple(map(int, filename.split('/')[-1].split('_')[0:2]))
                     gender = 1 - gender
@@ -272,13 +268,47 @@ def load_data(
         mode: str = 'train',
         db: str = 'imdb_wiki',
         collect_targets: bool = True
-) -> Union[DataLoader, Tuple[DataLoader, DataLoader]]:
+) -> DataLoader:
     x, y_age, y_gender = get_data(path, collect_targets=collect_targets, db=db)
 
     data = {
         'filenames': x,
         'target_age': y_age,
         'target_gender': y_gender
+    }
+
+    loader = DataLoader(
+        ImageDataset(data, mode=mode),
+        batch_size=batch_size,
+        shuffle=mode == 'train',
+        num_workers=multiprocessing.cpu_count(),
+        pin_memory=config['use_gpu']
+    )
+
+    return loader
+
+
+def load_adience(
+        path: str,
+        batch_size: int = config['batch_size'],
+        mode: str = 'train'
+) -> DataLoader:
+    filenames = []
+    target_age = []
+    target_gender = []
+
+    for root, _, files in os.walk(path):
+        for filename in files:
+            filenames.append(os.path.join(root, filename))
+            age, gender = tuple(map(int, filename.split('_')[1:3]))
+
+            target_age.append(age)
+            target_gender.append(1 - gender)
+
+    data = {
+        'filenames': np.array(filenames),
+        'target_age': np.array(target_age),
+        'target_gender': np.array(target_gender)
     }
 
     loader = DataLoader(

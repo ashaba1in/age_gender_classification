@@ -8,6 +8,8 @@ matplotlib.use('Agg')
 
 import sys
 
+import torch.nn.functional as f
+
 import matplotlib.pyplot as plt
 import seaborn as sns
 from tqdm.autonotebook import tqdm
@@ -63,18 +65,20 @@ age_multiplier = torch.from_numpy(np.arange(config['num_classes_age'])).to(DEVIC
 
 def get_lr(epoch, key):
     milestones = LEARNING_RATE[key]['milestones']
+    lr = LEARNING_RATE[key]['other']
     for milestone in milestones.keys():
-        if epoch > int(milestone):
-            return milestones[milestone]
-    return LEARNING_RATE[key]['other']
+        if epoch < int(milestone):
+            lr = milestones[milestone]
+    return lr
 
 
 def get_wd(epoch, key):
     milestones = WEIGHT_DECAY[key]['milestones']
+    wd = WEIGHT_DECAY[key]['other']
     for milestone in milestones.keys():
-        if epoch > int(milestone):
-            return milestones[milestone]
-    return WEIGHT_DECAY[key]['other']
+        if epoch < int(milestone):
+            wd = milestones[milestone]
+    return wd
 
 
 def update_bars(msg: str, len1: int = None, len2: int = None):
@@ -140,7 +144,7 @@ def evaluate(data_loader, model, criterions):
             loss_gender += criterion_gender(output_gender, labels_gender)
 
             pred_age = sum(
-                output_age * age_multiplier,
+                f.softmax(output_age, 1) * age_multiplier,
                 dim=1,
                 keepdim=True
             )
@@ -234,7 +238,7 @@ def main(model_name):
         'gender_test': []
     }
 
-    criterion_age = torch.nn.BCELoss(reduction='sum')
+    criterion_age = torch.nn.BCEWithLogitsLoss(reduction='sum')
     criterion_gender = torch.nn.CrossEntropyLoss(reduction='sum')
 
     model = Model().to(DEVICE)
@@ -309,9 +313,9 @@ def main(model_name):
         history['gender_train'].append(inference_train[2])
         history['gender_test'].append(inference_test[2])
 
-        save(model.state_dict(), os.path.join(MODELS_PATH, '{}_{}.pth'.format(model_name, epoch)))
-
         plot_results(history, model_name)
+
+        save(model.state_dict(), os.path.join(MODELS_PATH, '{}_{}.pth'.format(model_name, epoch)))
 
         update_bars('epochs')
 
