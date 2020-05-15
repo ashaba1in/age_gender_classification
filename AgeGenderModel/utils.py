@@ -76,7 +76,7 @@ class ImageDataset(torch.utils.data.Dataset):
 
         if self.mode == 'inference':
             return image
-        return image, self.targets_age[index], self.targets_gender[index]
+        return image, self.targets_age[index][0], self.targets_age[index][1], self.targets_gender[index]
 
     def __len__(self) -> int:
         return len(self.data['filenames'])
@@ -235,13 +235,14 @@ def get_data(path: str, db: str, collect_targets: bool = True) -> Tuple[np.ndarr
     target_age = []
     target_gender = []
 
-    def gaussian_prob(true, var=AGE_SHIFT):
+    def bernoulli_prob(true, var=AGE_SHIFT):
         x = np.arange(0, MAX_AGE + 1, 1)
-        p = np.exp(-np.square(x - true) / (2 * var ** 2)) / (var * (2 * np.pi ** 0.5))
-        return p / p.max()
+        p = np.zeros_like(x)
+        p[np.abs(x - true) <= var] = 1
+        return p
 
     age_vectors = [
-        gaussian_prob(x) for x in range(0, MAX_AGE + 1)
+        bernoulli_prob(x) for x in range(0, MAX_AGE + 1)
     ]
 
     for root, _, files in os.walk(path):
@@ -254,7 +255,7 @@ def get_data(path: str, db: str, collect_targets: bool = True) -> Tuple[np.ndarr
                     age, gender = tuple(map(int, filename.split('/')[-1].split('_')[0:2]))
                     gender = 1 - gender
 
-                target_age.append(age_vectors[age])
+                target_age.append([age_vectors[age], np.array([age])])
                 target_gender.append(gender)
 
     if collect_targets:
@@ -302,7 +303,7 @@ def load_adience(
             filenames.append(os.path.join(root, filename))
             age, gender = tuple(map(int, filename.split('_')[1:3]))
 
-            target_age.append(age)
+            target_age.append([age, np.empty(0)])
             target_gender.append(1 - gender)
 
     data = {

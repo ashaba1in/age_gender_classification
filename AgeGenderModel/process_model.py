@@ -8,12 +8,11 @@ matplotlib.use('Agg')
 
 import sys
 
-import torch.nn.functional as f
-
 import matplotlib.pyplot as plt
 import seaborn as sns
 from tqdm.autonotebook import tqdm
 import torch
+from torch.nn.functional import softmax
 from torch import (
     save,
     sum,
@@ -106,7 +105,7 @@ def train(data_loader, model, optimizer, criterions):
 
     model.train()
 
-    for images, labels_age, labels_gender in data_loader:
+    for images, labels_age, _, labels_gender in data_loader:
         images, labels_age, labels_gender = images.to(DEVICE), labels_age.to(DEVICE), labels_gender.to(DEVICE)
 
         optimizer.zero_grad()
@@ -135,8 +134,9 @@ def evaluate(data_loader, model, criterions):
     criterion_age, criterion_gender = criterions
 
     with torch.no_grad():
-        for images, labels_age, labels_gender in data_loader:
+        for images, labels_age, true_age, labels_gender in data_loader:
             images, labels_age, labels_gender = images.to(DEVICE), labels_age.to(DEVICE), labels_gender.to(DEVICE)
+            true_age = true_age.to(DEVICE)
 
             output_age, output_gender = model(images)
 
@@ -144,11 +144,10 @@ def evaluate(data_loader, model, criterions):
             loss_gender += criterion_gender(output_gender, labels_gender)
 
             pred_age = sum(
-                f.softmax(output_age, 1) * age_multiplier,
+                softmax(output_age, 1) * age_multiplier,
                 dim=1,
                 keepdim=True
             )
-            true_age = labels_age.data.max(1, keepdim=True)[1]
 
             shift = abs(pred_age - true_age).cpu()
 

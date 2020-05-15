@@ -12,11 +12,11 @@ import seaborn as sns
 sns.set(style='darkgrid')
 import torch
 import torch.backends.cudnn as cudnn
+from torch.nn.functional import sigmoid
 from torch import (
     cat,
-    sum,
+    mean,
 )
-from torch.nn.functional import softmax
 from tqdm import tqdm
 
 from model import Model
@@ -78,8 +78,12 @@ def evaluate_adience(data_loader, model):
 
             output_age, output_gender = model(images)
 
-            pred_age = sum(
-                softmax(output_age, 1) * age_multiplier,
+            output_age = (sigmoid(output_age) > 0.5).float()
+
+            pred_age = age_multiplier * output_age
+
+            pred_age = mean(
+                pred_age[output_age > 0],
                 dim=1,
                 keepdim=True
             ).cpu().numpy()
@@ -103,7 +107,7 @@ def main():
     one_off = np.zeros(8)
     gender = np.zeros(8)
 
-    total_len = 0
+    total_len = np.zeros(8)
 
     for i in range(5):
         loader = load_adience(path=os.path.join(IMAGE_PATH, 'fold{}'.format(i)), batch_size=BATCH_SIZE, mode='test')
@@ -112,6 +116,7 @@ def main():
         true_groups, true_genders = loader.dataset.targets_age, loader.dataset.targets_gender
         for j in range(8):
             mask = true_groups == j
+            total_len[j] += np.sum(mask)
 
             exact[j] += np.sum(groups[mask] == true_groups[mask])
             one_off[j] += np.sum(np.abs(groups[mask] - true_groups[mask]) <= 1)
