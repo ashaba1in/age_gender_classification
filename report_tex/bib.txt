@@ -1,5 +1,0 @@
-https://data.vision.ee.ethz.ch/cvl/publications/papers/articles/eth_biwi_01299.pdf - IMDB-WIKI
-https://yanweifu.github.io/FG_NET_data/ - FGNET
-https://arxiv.org/abs/1512.03385 - ResNet
-https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py - ResNet
-https://arxiv.org/abs/1412.6980 - Adam
