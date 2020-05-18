@@ -37,7 +37,6 @@
 \renewcommand{\theenumiii}{.\arabic{enumiii}}% Меняем везде перечисления на цифра.цифра
 \renewcommand{\labelenumiii}{\arabic{enumi}.\arabic{enumii}.\arabic{enumiii}.}% Меняем везде перечисления на цифра.цифра
 
-
 \begin{document}
     \input{title.tex}
     \newpage
@@ -87,30 +86,27 @@
         \\
         \small \textbf{\textit{Keywords---}}Age and gender estimation, Facial detection, Computer vision, Deep learning
         \\
-        \newpage
     \end{abstract}
+    \newpage
 
     \section{Введение}\label{sec:введение}
     \input{introduction}
 
-
     \section{Обзор литературы}\label{sec:обзор-литературы}
     \input{literature}
-
+    \newpage
 
     \section{Детектирование лиц}\label{sec:детектирование-лиц}
     \input{detection}
-
+    \newpage
 
     \section{Классификация гендерных и возрастных групп}\label{sec:классификация-гендерных-и-возрастных-групп}
     \input{age_gender}
     \newpage
 
-
     \section{Описание системы для пользователя}\label{sec:описание-системы-для-пользователя}
     \input{system}
     \newpage
-
 
     \section{Заключение}\label{sec:выводы}
     Решая поставленную задачу о классификации людей на фотографиях по полу и возрасту мы получили алгоритм,
@@ -124,7 +120,6 @@
     Определенно положительно бы сказалась дальнейшая работа по улучшению качества всех моделей, по уменьшению их размера и скорости работы.
     Также имеет смысл добавить в структуру нашего решения фильтрацию неживых лиц - памятников и лиц на рекламных щитах и постерах.
     \newpage
-
 
     \section{Список литературы}\label{sec:список-литературы}
     \input{bibliography}
