@@ -60,7 +60,7 @@
         \par Для классификации найденных лиц мы используем модель на основе двух ResNet-18.
         В качестве обучающих данных мы испольуем датасеты IMDB-WIKI-101 и FGNET\@.
         В качестве тестовых данных мы используем датасет Adience, наша модель получает для возраста значение метрики
-        Accuracy 45\% и значение метрики One-off-accuracy 80\%, для пола значение метрики Accuracy 85\%.
+        Accuracy 56\% и значение метрики One-off-accuracy 91\%, для пола значение метрики Accuracy 93\%.
         \par В итоге мы получили рабочую модель, способную обрабатывать большие массивы фотографий,
         детектировать на них людей и предсказывать для их пол и возраст в автоматическом режиме.
         Ссылка на гитхаб с проектом - \url{https://github.com/birshert/age_gender_classification}.
@@ -78,8 +78,8 @@
         On testing subset we achieve 83\% Precision result.
         \par For real age and gender estimation we use a model based on two ResNet-18.
         For training we use IMDB-WIKI-101 dataset and FGNET dataset.
-        For testing we use Adience dataset, our model achieves 45\% Accuracy, 80\% One-off-accuracy for age estimation
-        and 85\% Accuracy for gender prediction.
+        For testing we use Adience dataset, our model achieves 56\% Accuracy, 91\% One-off-accuracy for age estimation
+        and 93\% Accuracy for gender prediction.
         \par As a result, we got a working model capable of processing large volumes of photos,
         detecting people faces on them and predicting their real age and gender in automatic mode.
         Github project link - \url{https://github.com/birshert/age_gender_classification}.
@@ -104,9 +104,11 @@
     \input{age_gender}
     \newpage
 
+
     \section{Описание системы для пользователя}\label{sec:описание-системы-для-пользователя}
     \input{system}
     \newpage
+
 
     \section{Заключение}\label{sec:выводы}
     Решая поставленную задачу о классификации людей на фотографиях по полу и возрасту мы получили алгоритм,
@@ -114,12 +116,14 @@
     При решении мы опробовали множество различных подходов и остановились на архитектуре RetinaFace для детектирования лиц
     и двух ResNet для классификации пола и возраста.
     \par Наша модель для детекции лиц показывает значение метрики Precision равное 83\% на датасете WIDER FACE~\cite{wider}.
-    Наша модель для классификации пола и возраста показывает значение метрики Accuracy 45\% и
-    значение метрики One-off-accuracy 80\%, для пола значение метрики Accuracy 85\% на датасете Adience~\cite{adience}.
+    Наша модель для классификации пола и возраста показывает значение метрики Accuracy 56\% и
+    значение метрики One-off-accuracy 91\%, для пола значение метрики Accuracy 93\% на датасете Adience~\cite{adience}.
     \par Для улучшения качества классификации в дальнейшем у нас есть несколько идей, которые мы не успели реализовать.
+    Существует несколько методов, сравнение с которыми не производилось.
     Определенно положительно бы сказалась дальнейшая работа по улучшению качества всех моделей, по уменьшению их размера и скорости работы.
     Также имеет смысл добавить в структуру нашего решения фильтрацию неживых лиц - памятников и лиц на рекламных щитах и постерах.
     \newpage
+
 
     \section{Список литературы}\label{sec:список-литературы}
     \input{bibliography}
